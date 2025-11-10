@@ -1,0 +1,242 @@
+{
+    "id": "default",
+    "name": "Mapa Principal",
+    "territories": [
+        {
+            "id": "t1",
+            "name": "Spawn Norte",
+            "x": 200,
+            "y": 100,
+            "isSpawn": true,
+            "spawnIndex": 0
+        },
+        {
+            "id": "t2",
+            "name": "Spawn Sur",
+            "x": 200,
+            "y": 500,
+            "isSpawn": true,
+            "spawnIndex": 1
+        },
+        {
+            "id": "t3",
+            "name": "Spawn Este",
+            "x": 600,
+            "y": 300,
+            "isSpawn": true,
+            "spawnIndex": 2
+        },
+        {
+            "id": "t4",
+            "name": "Spawn Oeste",
+            "x": 100,
+            "y": 300,
+            "isSpawn": true,
+            "spawnIndex": 3
+        },
+        {
+            "id": "t5",
+            "name": "Zona Central",
+            "x": 300,
+            "y": 300,
+            "zone": "oro"
+        },
+        {
+            "id": "t6",
+            "name": "Colina Veloz",
+            "x": 400,
+            "y": 200,
+            "zone": "veloz"
+        },
+        {
+            "id": "t7",
+            "name": "Campo de Batalla",
+            "x": 500,
+            "y": 300,
+            "zone": "batalla"
+        },
+        {
+            "id": "t8",
+            "name": "Fortaleza",
+            "x": 300,
+            "y": 400,
+            "zone": "amurallada"
+        },
+        {
+            "id": "t9",
+            "name": "Baluarte",
+            "x": 200,
+            "y": 300,
+            "zone": "defensiva"
+        },
+        {
+            "id": "t10",
+            "name": "Cuartel",
+            "x": 400,
+            "y": 400,
+            "zone": "reclutamiento"
+        },
+        {
+            "id": "t11",
+            "name": "Bosque Norte",
+            "x": 250,
+            "y": 150
+        },
+        {
+            "id": "t12",
+            "name": "Llanura Norte",
+            "x": 350,
+            "y": 150
+        },
+        {
+            "id": "t13",
+            "name": "Montaña Este",
+            "x": 550,
+            "y": 250
+        },
+        {
+            "id": "t14",
+            "name": "Valle Este",
+            "x": 550,
+            "y": 350
+        },
+        {
+            "id": "t15",
+            "name": "Desierto Sur",
+            "x": 250,
+            "y": 450
+        },
+        {
+            "id": "t16",
+            "name": "Pantano Sur",
+            "x": 350,
+            "y": 450
+        },
+        {
+            "id": "t17",
+            "name": "Costa Oeste",
+            "x": 150,
+            "y": 250
+        },
+        {
+            "id": "t18",
+            "name": "Isla Oeste",
+            "x": 150,
+            "y": 350
+        }
+    ],
+    "adjacencies": [
+        [
+            "t1",
+            "t11"
+        ],
+        [
+            "t1",
+            "t12"
+        ],
+        [
+            "t2",
+            "t15"
+        ],
+        [
+            "t2",
+            "t16"
+        ],
+        [
+            "t3",
+            "t13"
+        ],
+        [
+            "t3",
+            "t14"
+        ],
+        [
+            "t4",
+            "t17"
+        ],
+        [
+            "t4",
+            "t18"
+        ],
+        [
+            "t5",
+            "t6"
+        ],
+        [
+            "t5",
+            "t7"
+        ],
+        [
+            "t5",
+            "t8"
+        ],
+        [
+            "t5",
+            "t9"
+        ],
+        [
+            "t5",
+            "t10"
+        ],
+        [
+            "t6",
+            "t12"
+        ],
+        [
+            "t6",
+            "t13"
+        ],
+        [
+            "t7",
+            "t13"
+        ],
+        [
+            "t7",
+            "t14"
+        ],
+        [
+            "t8",
+            "t10"
+        ],
+        [
+            "t8",
+            "t15"
+        ],
+        [
+            "t8",
+            "t16"
+        ],
+        [
+            "t9",
+            "t11"
+        ],
+        [
+            "t9",
+            "t17"
+        ],
+        [
+            "t10",
+            "t14"
+        ],
+        [
+            "t10",
+            "t16"
+        ],
+        [
+            "t11",
+            "t12"
+        ],
+        [
+            "t13",
+            "t14"
+        ],
+        [
+            "t15",
+            "t16"
+        ],
+        [
+            "t17",
+            "t18"
+        ]
+    ]
+}

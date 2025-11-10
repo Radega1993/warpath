@@ -1,0 +1,19 @@
+{
+    "name": "warpath",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Warpath - 4X-lite por turnos en mapa territorial",
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "build": "npm run build --workspaces",
+        "test": "npm run test --workspaces --if-present",
+        "test:coverage": "npm run test:coverage --workspace=@warpath/rules-engine",
+        "clean": "npm run clean --workspaces --if-present"
+    },
+    "devDependencies": {
+        "typescript": "^5.3.3"
+    }
+}

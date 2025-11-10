@@ -1,0 +1,23 @@
+{
+    "name": "@warpath/rules-engine",
+    "version": "0.1.0",
+    "private": true,
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "test": "vitest",
+        "test:coverage": "vitest --coverage",
+        "test:simulate": "ts-node src/simulate.ts",
+        "clean": "rm -rf dist"
+    },
+    "dependencies": {
+        "@warpath/shared": "*"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.0",
+        "typescript": "^5.3.3",
+        "vitest": "^1.2.0",
+        "@vitest/coverage-v8": "^1.2.0"
+    }
+}

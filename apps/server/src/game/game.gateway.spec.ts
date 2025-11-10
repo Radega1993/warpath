@@ -1,0 +1,251 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { GameGateway } from './game.gateway';
+import { GameService } from './game.service';
+import { TimerService } from './timer.service';
+import { RoomsService } from '../rooms/rooms.service';
+import { MatchService } from '../match/match.service';
+import { TelemetryService } from '../telemetry/telemetry.service';
+import { AuthenticatedSocket } from '../common/types';
+
+describe('GameGateway', () => {
+    let gateway: GameGateway;
+    let gameService: GameService;
+    let timerService: TimerService;
+    let mockSocket: Partial<AuthenticatedSocket>;
+
+    beforeEach(async () => {
+        const mockGameService = {
+            startGame: jest.fn(),
+            getGame: jest.fn(),
+            serializeGameState: jest.fn(),
+            deployTroops: jest.fn(),
+            attackTerritory: jest.fn(),
+            fortify: jest.fn(),
+            upgradePath: jest.fn(),
+            endTurn: jest.fn(),
+            convertTroops: jest.fn(),
+        };
+
+        const mockTimerService = {
+            startTimer: jest.fn(),
+            stopTimer: jest.fn(),
+            getSecondsLeft: jest.fn(),
+        };
+
+        const mockRoomsService = {
+            getRoom: jest.fn(),
+        };
+
+        const mockMatchService = {
+            saveSnapshot: jest.fn(),
+        };
+
+        const mockTelemetryService = {
+            logTurnEnd: jest.fn(),
+            logMatchEnd: jest.fn(),
+        };
+
+        const module: TestingModule = await Test.createTestingModule({
+            providers: [
+                GameGateway,
+                { provide: GameService, useValue: mockGameService },
+                { provide: TimerService, useValue: mockTimerService },
+                { provide: RoomsService, useValue: mockRoomsService },
+                { provide: MatchService, useValue: mockMatchService },
+                { provide: TelemetryService, useValue: mockTelemetryService },
+            ],
+        }).compile();
+
+        gateway = module.get<GameGateway>(GameGateway);
+        gameService = module.get<GameService>(GameService);
+        timerService = module.get<TimerService>(TimerService);
+
+        mockSocket = {
+            id: 'socket-123',
+            userId: 'user-123',
+            roomId: 'room-123',
+            emit: jest.fn(),
+            on: jest.fn(),
+            disconnect: jest.fn(),
+            join: jest.fn(),
+            leave: jest.fn(),
+            to: jest.fn().mockReturnThis(),
+        };
+    });
+
+    it('should be defined', () => {
+        expect(gateway).toBeDefined();
+    });
+
+    describe('handleConnection', () => {
+        it('should extract roomId from namespace and send game state', async () => {
+            const mockGameState = {
+                id: 'game-123',
+                turn: 1,
+                phase: 'deploy',
+                timers: {
+                    turnSecondsLeft: 120,
+                },
+            };
+
+            const mockGame = {
+                getState: jest.fn().mockReturnValue(mockGameState),
+            };
+            (gameService.getGame as jest.Mock).mockReturnValue(mockGame);
+            (gameService.serializeGameState as jest.Mock).mockReturnValue(mockGameState);
+            (timerService.getSecondsLeft as jest.Mock).mockReturnValue(120);
+
+            // Mock the namespace extraction
+            (mockSocket as any).nsp = { name: '/room/room-123' };
+
+            gateway.handleConnection(mockSocket as AuthenticatedSocket);
+
+            expect(mockSocket.roomId).toBe('room-123');
+            // Verify that game state was emitted (the timers will be added by the gateway)
+            expect(mockSocket.emit).toHaveBeenCalledWith('game_state', expect.any(Object));
+        });
+    });
+
+    describe('handlePlace', () => {
+        it('should deploy troops to territory', async () => {
+            const mockGameState = {
+                id: 'game-123',
+                turn: 1,
+                phase: 'deploy',
+            };
+
+            const mockGame = {
+                deployTroops: jest.fn(),
+                getState: jest.fn().mockReturnValue(mockGameState),
+            };
+            (gameService.getGame as jest.Mock).mockReturnValue(mockGame);
+            (gameService.convertTroops as jest.Mock).mockReturnValue({ d6: 2 });
+            (gameService.serializeGameState as jest.Mock).mockReturnValue(mockGameState);
+
+            gateway.handlePlace(
+                mockSocket as AuthenticatedSocket,
+                { territoryId: 't1', units: { d6: 2 } },
+            );
+
+            expect(mockGame.deployTroops).toHaveBeenCalled();
+        });
+    });
+
+    describe('handleAttack', () => {
+        it('should attack territory', async () => {
+            const mockCombatResult = {
+                attackerRolls: [],
+                defenderRolls: [],
+                conquest: false,
+            };
+
+            const mockGameState = {
+                id: 'game-123',
+                turn: 1,
+                phase: 'attack',
+            };
+
+            const mockGame = {
+                attackTerritory: jest.fn(),
+                getState: jest.fn().mockReturnValue(mockGameState),
+            };
+            (gameService.getGame as jest.Mock).mockReturnValue(mockGame);
+            (gameService.convertTroops as jest.Mock).mockReturnValue({ d6: 2 });
+            (gameService.serializeGameState as jest.Mock).mockReturnValue(mockGameState);
+
+            // Mock attackTerritory to return combat result
+            mockGame.attackTerritory.mockReturnValue(mockCombatResult);
+
+            gateway.handleAttack(
+                mockSocket as AuthenticatedSocket,
+                { fromId: 't1', toId: 't2', commit: { d6: 2 } },
+            );
+
+            expect(mockGame.attackTerritory).toHaveBeenCalled();
+        });
+    });
+
+    describe('handleFortify', () => {
+        it('should fortify territory', async () => {
+            const mockGameState = {
+                id: 'game-123',
+                turn: 1,
+                phase: 'fortify',
+            };
+
+            const mockGame = {
+                fortify: jest.fn(),
+                getState: jest.fn().mockReturnValue(mockGameState),
+            };
+            (gameService.getGame as jest.Mock).mockReturnValue(mockGame);
+            (gameService.convertTroops as jest.Mock).mockReturnValue({ d6: 2 });
+            (gameService.serializeGameState as jest.Mock).mockReturnValue(mockGameState);
+
+            gateway.handleFortify(
+                mockSocket as AuthenticatedSocket,
+                { fromId: 't1', toId: 't2', units: { d6: 2 } },
+            );
+
+            expect(mockGame.fortify).toHaveBeenCalled();
+        });
+    });
+
+    describe('handleUpgradePath', () => {
+        it('should upgrade path', async () => {
+            const mockGameState = {
+                id: 'game-123',
+                turn: 1,
+                phase: 'deploy',
+            };
+
+            const mockGame = {
+                upgradePath: jest.fn(),
+                getState: jest.fn().mockReturnValue(mockGameState),
+            };
+            (gameService.getGame as jest.Mock).mockReturnValue(mockGame);
+            (gameService.serializeGameState as jest.Mock).mockReturnValue(mockGameState);
+
+            gateway.handleUpgradePath(
+                mockSocket as AuthenticatedSocket,
+                { pathId: 'power' },
+            );
+
+            expect(mockGame.upgradePath).toHaveBeenCalled();
+        });
+    });
+
+    describe('handleEndTurn', () => {
+        it('should end turn and advance to next player', async () => {
+            const mockGameState = {
+                id: 'game-123',
+                turn: 2,
+                phase: 'deploy',
+                players: {
+                    'user-123': {
+                        id: 'user-123',
+                        gold: 100,
+                    },
+                },
+                currentPlayerId: 'user-123',
+            };
+
+            const mockGame = {
+                endTurn: jest.fn(),
+                getState: jest.fn().mockReturnValue(mockGameState),
+            };
+            (gameService.getGame as jest.Mock).mockReturnValue(mockGame);
+            (gameService.serializeGameState as jest.Mock).mockReturnValue(mockGameState);
+            (timerService.stopTimer as jest.Mock).mockReturnValue(undefined);
+            (timerService.startTimer as jest.Mock).mockReturnValue(undefined);
+
+            gateway.handleEndTurn(
+                mockSocket as AuthenticatedSocket,
+            );
+
+            expect(mockGame.endTurn).toHaveBeenCalled();
+            expect(timerService.stopTimer).toHaveBeenCalled();
+            expect(timerService.startTimer).toHaveBeenCalled();
+        });
+    });
+});
+
