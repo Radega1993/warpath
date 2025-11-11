@@ -18,6 +18,7 @@ export {
     calculateUnitCost,
     calculateActions,
     canAffordUnit,
-    canDeployRank
+    canDeployRank,
+    getChiefLimit
 } from './economy';
 

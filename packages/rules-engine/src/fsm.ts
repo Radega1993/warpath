@@ -11,7 +11,7 @@ import {
 } from './types';
 import { SeededRNG } from './rng';
 import { resolveCombat, createEmptyTroops, sumTroops } from './combat';
-import { calculateIncome, calculateActions, canAffordUnit, canDeployRank, calculateUnitCost } from './economy';
+import { calculateIncome, calculateActions, canAffordUnit, canDeployRank, calculateUnitCost, getChiefLimit } from './economy';
 import { CombatModifiers } from './types';
 
 /**
@@ -97,6 +97,46 @@ export class GameFSM {
 
         // Verificar costes y límites
         let totalCost = 0;
+        let freeUnitsFromRecruitment = 0;
+
+        // Zona Reclutamiento: +1 tropa gratis
+        if (territory.zone === ZoneType.RECRUITMENT) {
+            freeUnitsFromRecruitment = 1;
+        }
+
+        // Camino de la Tierra N3: +1 tropa gratis adicional en Reclutamiento
+        if (territory.zone === ZoneType.RECRUITMENT && player.paths[PathType.LAND] >= 3) {
+            freeUnitsFromRecruitment += 1; // Total: 2 tropas gratis
+        }
+
+        // Verificar límite de jefes
+        if (troops[UnitRank.CHIEF] > 0) {
+            // Contar jefes actuales del jugador en todos sus territorios
+            let currentChiefs = 0;
+            for (const territoryId of player.territories) {
+                const t = this.state.territories[territoryId];
+                if (t) {
+                    currentChiefs += t.troops[UnitRank.CHIEF] || 0;
+                }
+            }
+
+            const chiefLimit = getChiefLimit(player);
+            const newChiefCount = currentChiefs + troops[UnitRank.CHIEF];
+
+            if (newChiefCount > chiefLimit) {
+                throw new Error(`Cannot deploy ${troops[UnitRank.CHIEF]} chiefs. Maximum allowed: ${chiefLimit} (current: ${currentChiefs})`);
+            }
+        }
+
+        // Calcular total de tropas a desplegar
+        let totalUnitsToDeploy = 0;
+        for (const rank of Object.keys(troops) as UnitRank[]) {
+            totalUnitsToDeploy += troops[rank];
+        }
+
+        // Aplicar unidades gratis (a las primeras tropas desplegadas)
+        let remainingFreeUnits = freeUnitsFromRecruitment;
+
         for (const rank of Object.keys(troops) as UnitRank[]) {
             const count = troops[rank];
             if (count <= 0) continue;
@@ -105,11 +145,19 @@ export class GameFSM {
                 throw new Error(`Cannot deploy ${rank} - path not unlocked`);
             }
 
-            if (!canAffordUnit(player, rank, count)) {
-                throw new Error(`Cannot afford ${count} ${rank}`);
+            // Calcular cuántas unidades de este rango son gratis
+            let unitsToPay = count;
+            if (remainingFreeUnits > 0) {
+                const freeForThisRank = Math.min(count, remainingFreeUnits);
+                unitsToPay = count - freeForThisRank;
+                remainingFreeUnits -= freeForThisRank;
             }
 
-            totalCost += calculateUnitCost(rank, player) * count;
+            if (unitsToPay > 0 && !canAffordUnit(player, rank, unitsToPay)) {
+                throw new Error(`Cannot afford ${unitsToPay} ${rank}`);
+            }
+
+            totalCost += calculateUnitCost(rank, player) * unitsToPay;
         }
 
         // Aplicar despliegue
@@ -301,6 +349,16 @@ export class GameFSM {
 
         // Resetear acciones
         nextPlayer.actions = calculateActions(nextPlayer);
+
+        // Zona Veloz: +1 Acción adicional
+        for (const territoryId of nextPlayer.territories) {
+            const territory = this.state.territories[territoryId];
+            if (territory?.zone === ZoneType.FAST) {
+                nextPlayer.actions += 1;
+                break; // Solo una vez por jugador
+            }
+        }
+
         nextPlayer.actionsLeft = nextPlayer.actions;
 
         // Verificar condición de victoria
@@ -320,7 +378,8 @@ export class GameFSM {
             attackerRerolls: 0,
             defenderRerolls: 0,
             defenderDefenseBonus: 0,
-            maxTroopsPerSide: undefined
+            maxTroopsPerSide: undefined,
+            luckBoostElites: false
         };
 
         // Eficacia del atacante
@@ -328,9 +387,24 @@ export class GameFSM {
             modifiers.attackerEfficiency = true;
         }
 
+        // Nivel 3: +1 al dado atacando
+        if (attacker.clanLevel >= 3) {
+            modifiers.attackerEfficiency = true; // Ya aplica +1, pero se puede acumular con otros efectos
+        }
+
         // Rerolls del atacante
         if (attacker.heroId === HeroType.MASTER) {
             modifiers.attackerRerolls = 3;
+        }
+
+        // Camino de la Suerte N1: +1 reroll para atacante
+        if (attacker.paths[PathType.LUCK] >= 1) {
+            modifiers.attackerRerolls += 1;
+        }
+
+        // Camino de la Suerte N3: boost a élites
+        if (attacker.paths[PathType.LUCK] >= 3) {
+            modifiers.luckBoostElites = true;
         }
 
         // Eficacia del defensor
@@ -341,6 +415,14 @@ export class GameFSM {
         // Bonificación de defensa (Zona Amurallada)
         if (defenderTerritory.zone === ZoneType.WALLED) {
             modifiers.defenderDefenseBonus = 2;
+        }
+
+        // Camino de la Suerte N2: +1 defensa bonus para defensor
+        if (defenderTerritory.ownerId) {
+            const defender = this.state.players[defenderTerritory.ownerId];
+            if (defender && defender.paths[PathType.LUCK] >= 2) {
+                modifiers.defenderDefenseBonus += 1;
+            }
         }
 
         // Límite de tropas (Zona Defensiva)

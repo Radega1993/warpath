@@ -45,7 +45,7 @@ describe('GameService', () => {
             const roomId = 'test-room';
             const mockRoom = {
                 id: roomId,
-                status: 'ready',
+                status: 'in_progress', // El código espera 'in_progress', no 'ready'
                 players: [
                     {
                         userId: 'user1',
@@ -106,7 +106,7 @@ describe('GameService', () => {
             const roomId = 'test-room';
             const mockRoom = {
                 id: roomId,
-                status: 'ready',
+                status: 'in_progress', // El código espera 'in_progress'
                 players: [
                     {
                         userId: 'user1',
@@ -175,7 +175,7 @@ describe('GameService', () => {
             const roomId = 'test-room';
             const mockRoom = {
                 id: roomId,
-                status: 'ready',
+                status: 'in_progress', // El código espera 'in_progress'
                 players: [
                     {
                         userId: 'user1',
@@ -193,7 +193,8 @@ describe('GameService', () => {
             jest.spyOn(matchService, 'saveSnapshot').mockImplementation(() => { });
 
             const fsm = service.startGame(roomId);
-            const serialized = service.serializeGameState(fsm);
+            expect(fsm).not.toBeNull();
+            const serialized = service.serializeGameState(fsm!);
 
             expect(serialized).toHaveProperty('turn');
             expect(serialized).toHaveProperty('phase');

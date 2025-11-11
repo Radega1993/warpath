@@ -1,0 +1,127 @@
+{
+    "economy": {
+        "baseIncomePerTerritory": 50,
+        "merchantHeroBonus": 50
+    },
+    "zones": {
+        "gold": {
+            "incomeBonus": 150
+        },
+        "fast": {
+            "actionBonus": 1
+        },
+        "battle": {
+            "efficiencyBonus": true
+        },
+        "walled": {
+            "defenseBonus": 2
+        },
+        "defensive": {
+            "maxTroopsPerSide": 10
+        },
+        "recruitment": {
+            "freeUnit": true,
+            "freeUnitType": "warrior"
+        }
+    },
+    "paths": {
+        "clan": {
+            "n1": {
+                "unlocksClanLevel": 2
+            },
+            "n2": {
+                "unlocksClanLevel": 3
+            },
+            "n3": {
+                "actionBonus": 1,
+                "freeWarriorOnDeploy": true
+            }
+        },
+        "treasure": {
+            "n1": {
+                "incomePerTerritory": 25
+            },
+            "n2": {
+                "flatIncomeBonus": 125
+            },
+            "n3": {
+                "flatIncomeBonus": 300
+            }
+        },
+        "power": {
+            "n1": {
+                "unlocksRank": "elite"
+            },
+            "n2": {
+                "unlocksRank": "hero"
+            },
+            "n3": {
+                "unlocksRank": "legend"
+            }
+        },
+        "luck": {
+            "n1": {
+                "attackerRerolls": 1
+            },
+            "n2": {
+                "defenderDefenseBonus": 1
+            },
+            "n3": {
+                "eliteBoost": 1
+            }
+        },
+        "land": {
+            "n1": {
+                "costReduction": 0.1
+            },
+            "n2": {
+                "costReduction": 0.15
+            },
+            "n3": {
+                "costReduction": 0.2,
+                "freeUnitInRecruitment": true
+            }
+        },
+        "war": {
+            "n1": {
+                "efficiency": true
+            },
+            "n2": {
+                "actionBonus": 1
+            },
+            "n3": {
+                "maxChiefs": 2,
+                "note": "Permite tener hasta 2 jefes simultáneamente (sin WAR N3 solo 1)"
+            }
+        }
+    },
+    "clanLevels": {
+        "level2": {
+            "unlockedBy": "clan_n1"
+        },
+        "level3": {
+            "unlockedBy": "clan_n2",
+            "attackBonus": 1
+        }
+    },
+    "unitCosts": {
+        "explorer": 150,
+        "warrior": 250,
+        "elite": 300,
+        "hero": 350,
+        "chief": 1000,
+        "legend": 5000
+    },
+    "unitLimits": {
+        "explorer": 20,
+        "warrior": 25,
+        "elite": 15,
+        "hero": 10,
+        "chief": 1,
+        "legend": 3
+    },
+    "combat": {
+        "damageThreshold": 8,
+        "tieRule": "same_rank_both_die"
+    }
+}

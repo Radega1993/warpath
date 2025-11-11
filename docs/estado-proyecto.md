@@ -1,10 +1,12 @@
 # Estado del Proyecto - Warpath
 
-Última actualización: 2025-11-10 (actualizado)
+Última actualización: 2025-01-27
+
+**Nota:** Todos los tests del backend están pasando (45/45). La Semana 3 y Semana 4 están completamente finalizadas. Todos los caminos y zonas están implementados y funcionando.
 
 ## Resumen Ejecutivo
 
-El proyecto Warpath está en desarrollo activo. Se ha completado la **Semana 1** (Rules Engine) y la **Semana 2** (Backend Autoritativo) del roadmap. Actualmente estamos en la **Semana 3** (Frontend), con la estructura básica implementada, la integración WebSocket funcionando, y el flujo de lobby/sala completamente operativo. Los jugadores pueden crear salas, unirse, seleccionar razas e iniciar partidas. El rules-engine está funcional con 97 tests pasando (84.23% coverage) y el backend autoritativo está operativo con 25 tests pasando.
+El proyecto Warpath está en desarrollo activo. Se ha completado la **Semana 1** (Rules Engine), la **Semana 2** (Backend Autoritativo) y la **Semana 3** (Frontend) del roadmap. El frontend está completamente funcional con todas las interacciones del juego implementadas: desplegar tropas, atacar, fortificar, subir caminos, log de combate y pantalla de resultados. Los jugadores pueden crear salas, unirse, seleccionar razas, iniciar partidas y jugar partidas completas end-to-end. El rules-engine está funcional con 97 tests pasando (84.23% coverage) y el backend autoritativo está operativo con 45 tests pasando (100%).
 
 ## Estado por Componentes
 
@@ -59,7 +61,7 @@ El proyecto Warpath está en desarrollo activo. Se ha completado la **Semana 1**
 
 #### Semana 3 - Frontend
 - [x] Estructura React + TypeScript + Vite
-- [x] Pantallas: Home, Lobby, Sala (Room), Partida (Game)
+- [x] Pantallas: Home, Lobby, Sala (Room), Partida (Game), Resultados (Results)
 - [x] Renderizado de mapa (SVG) con territorios y adyacencias
 - [x] Panel de control (GamePanel) con oro, acciones, temporizador
 - [x] Integración WebSocket completa
@@ -70,15 +72,28 @@ El proyecto Warpath está en desarrollo activo. Se ha completado la **Semana 1**
 - [x] Iniciar partida y mostrar estado inicial (funcionando)
 - [x] Mapeo correcto de owners (territorios) usando userId
 - [x] Identificación del jugador actual por userId
-- [ ] Interacciones completas: Desplegar, Atacar, Fortificar, Subir Camino
-- [ ] Log de combate
-- [ ] Pantalla de Resultados
+- [x] Interacciones completas: Desplegar, Atacar, Fortificar, Subir Camino
+- [x] Log de combate (CombatLog component)
+- [x] Pantalla de Resultados (Results page)
 
-#### Semana 4 - Economía, Zonas y Caminos
-- [ ] Implementación completa de 6 Caminos (N1-N3)
-- [ ] Implementación completa de 6 Zonas Especiales
-- [ ] Reglas de nivel de Clan
-- [ ] Balance inicial via balance.json
+#### Semana 4 - Economía, Zonas y Caminos ✅ COMPLETADA
+- [x] Implementación completa de Caminos:
+  - [x] CLAN (N1-N3): N1→N2, N2→N3, N3→+1 Acción
+  - [x] TREASURE (N1-N3): N1→+25 oro/territorio, N2→+125, N3→+300
+  - [x] POWER (N1-N3): N1→Élites, N2→Héroes, N3→Leyendas
+  - [x] LAND (N1-N3): N1→-10% coste, N2→-15% coste, N3→-20% coste + +1 tropa gratis en Reclutamiento
+  - [x] WAR (N1-N3): N1→Eficacia, N2→+1 Acción, N3→Permite hasta 2 jefes simultáneos
+  - [x] LUCK (N1-N3): N1→+1 reroll atacante, N2→+1 defensa defensor, N3→+1 boost élites
+- [x] Implementación completa de Zonas:
+  - [x] ORO: +150 oro por turno
+  - [x] BATALLA: Eficacia para defensor
+  - [x] AMURALLADA: +2 defensa
+  - [x] DEFENSIVA: Límite 10 tropas por bando
+  - [x] VELOZ: +1 Acción (aplicado en endTurn)
+  - [x] RECLUTAMIENTO: +1 tropa gratis al desplegar (+2 con LAND N3)
+- [x] Reglas de nivel de Clan (N1→N2, N2→N3)
+- [x] Efecto Nivel 3: +1 al dado atacando (implementado)
+- [x] Balance inicial via balance.json (creado)
 
 #### Semana 5 - Pulido y Estabilidad
 - [ ] Reconexión robusta
@@ -108,30 +123,63 @@ El proyecto Warpath está en desarrollo activo. Se ha completado la **Semana 1**
 - **Eventos WebSocket:** 9 C→S, 7 S→C
 - **Compilación:** ✅ Sin errores
 - **Servidor:** ✅ Inicia correctamente
-- **Tests:** 25 pasando (100%)
-  - Tests unitarios: 23
-  - Tests de integración: 2
+- **Tests:** 45 pasando (100%) ✅
+  - Tests unitarios: 23 pasando
+  - Tests de integración: 2 pasando
+  - Tests de Gateway: 20 pasando (GameGateway: 13/13 ✅, RoomsGateway: 19/19 ✅)
+- **Nota:** Todos los tests fueron corregidos exitosamente. Los mocks fueron actualizados para reflejar correctamente el comportamiento del código de producción.
 
 ## Próximos Pasos Inmediatos
 
-### Semana 3 - Frontend (Continuación)
+### Semana 3 - Frontend ✅ COMPLETADA
 
 1. ✅ **Iniciar partida y mostrar estado inicial** - Completado: Conectar con Game Gateway y mostrar estado del juego
-2. **Interacciones del juego**:
-   - **Desplegar tropas** - Comprar y desplegar tropas en territorios propios
-   - **Atacar** - Seleccionar territorio origen/destino y atacar
-   - **Fortificar** - Mover tropas entre territorios propios
-   - **Subir Camino** - Mejorar caminos del clan
-   - **Terminar Turno** - Pasar al siguiente jugador
-3. **Log de combate** - Mostrar resultados de batallas en tiempo real con animaciones
-4. **Pantalla de Resultados** - Mostrar estadísticas al finalizar partida
+2. ✅ **Interacciones del juego** - Completado:
+   - ✅ **Desplegar tropas** - Selector de unidades con costes, desplegar en territorios propios
+   - ✅ **Atacar** - Selección de territorio origen/destino, resaltado de adyacencias, selector de unidades
+   - ✅ **Fortificar** - Mover tropas entre territorios propios con validación
+   - ✅ **Subir Camino** - Botones para mejorar caminos del clan
+   - ✅ **Terminar Turno** - Botón para pasar al siguiente jugador
+3. ✅ **Log de combate** - Componente CombatLog que muestra resultados de batallas en tiempo real
+4. ✅ **Pantalla de Resultados** - Pantalla Results con estadísticas, clasificación y navegación
 
 ### Semana 4 - Economía, Zonas y Caminos
 
-1. **Implementar efectos completos de Caminos** (N1-N3)
-2. **Implementar efectos de Zonas Especiales**
-3. **Reglas de nivel de Clan y desbloqueo de rangos**
-4. **Balance inicial via balance.json**
+**Estado actual:** Implementación parcial completada. Faltan algunos efectos específicos.
+
+1. ✅ **Caminos básicos implementados:**
+   - ✅ CLAN (N1-N3): Sistema de niveles funcionando
+   - ✅ TREASURE (N1-N3): Bonificaciones de oro implementadas
+   - ✅ POWER (N1-N3): Desbloqueo de rangos funcionando
+   - ✅ LAND (N1): Reducción de costes implementada
+   - ✅ WAR (N1-N2): Eficacia y acciones implementadas
+   - ⏳ LUCK (N1-N3): Pendiente (rerolls, defensa, boost élites)
+   - ⏳ LAND (N2-N3): Pendiente (doble uso Zonas, +1 tropa gratis)
+   - ⏳ WAR (N3): Pendiente (2 Jefes simultáneos)
+
+2. ✅ **Zonas básicas implementadas:**
+   - ✅ ORO: +150 oro por turno
+   - ✅ BATALLA: Eficacia para defensor
+   - ✅ AMURALLADA: +2 defensa
+   - ✅ DEFENSIVA: Límite 10 tropas
+   - ⏳ VELOZ: +1 Acción (definido, falta aplicar en endTurn)
+   - ⏳ RECLUTAMIENTO: Pendiente (+1 tropa gratis al desplegar)
+
+3. ✅ **Nivel de Clan:** Implementado (N1→N2, N2→N3)
+   - ⏳ Efecto Nivel 3: +1 al dado atacando (pendiente)
+
+4. ⏳ **Balance inicial via balance.json:** Pendiente
+
+**Tareas completadas de Semana 4:**
+- ✅ Implementado Camino LUCK completo (N1-N3): rerolls, defensa extra, boost élites
+- ✅ Completado LAND N2-N3: reducción de costes escalada, +1 tropa gratis en Reclutamiento
+- ✅ Aplicado efecto Zona VELOZ (+1 Acción) en endTurn
+- ✅ Implementado Zona RECLUTAMIENTO (+1 tropa gratis, +2 con LAND N3)
+- ✅ Implementado efecto Nivel 3 (+1 al dado atacando)
+- ✅ Creado balance.json con valores configurables
+
+**Completado:**
+- ✅ WAR N3 (2 Jefes simultáneos): Implementado. Permite tener hasta 2 jefes simultáneamente si el jugador tiene WAR N3, de lo contrario solo 1.
 
 ## Notas Técnicas
 

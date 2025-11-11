@@ -41,13 +41,24 @@ export function resolveCombat(
                 roll = Math.min(roll + 1, RANK_DICE[rank]);
             }
 
-            // Aplicar rerolls
+            // Camino de la Suerte N3: boost a élites (+1 al dado de élites)
+            if (rank === UnitRank.ELITE && modifiers.luckBoostElites) {
+                roll = Math.min(roll + 1, RANK_DICE[rank]);
+            }
+
+            // Aplicar rerolls (puede haber múltiples rerolls)
             if (modifiers.attackerRerolls > 0) {
-                const reroll = rng.rollDice(RANK_DICE[rank]);
-                if (modifiers.attackerEfficiency) {
-                    roll = Math.max(roll, Math.min(reroll + 1, RANK_DICE[rank]));
-                } else {
-                    roll = Math.max(roll, reroll);
+                for (let r = 0; r < modifiers.attackerRerolls; r++) {
+                    const reroll = rng.rollDice(RANK_DICE[rank]);
+                    let adjustedReroll = reroll;
+                    if (modifiers.attackerEfficiency) {
+                        adjustedReroll = Math.min(reroll + 1, RANK_DICE[rank]);
+                    }
+                    // Boost a élites también en rerolls
+                    if (rank === UnitRank.ELITE && modifiers.luckBoostElites) {
+                        adjustedReroll = Math.min(adjustedReroll + 1, RANK_DICE[rank]);
+                    }
+                    roll = Math.max(roll, adjustedReroll);
                 }
             }
 
@@ -72,17 +83,19 @@ export function resolveCombat(
                 roll = Math.min(roll + modifiers.defenderDefenseBonus, RANK_DICE[rank]);
             }
 
-            // Aplicar rerolls
+            // Aplicar rerolls (puede haber múltiples rerolls)
             if (modifiers.defenderRerolls > 0) {
-                const reroll = rng.rollDice(RANK_DICE[rank]);
-                let adjustedReroll = reroll;
-                if (modifiers.defenderEfficiency) {
-                    adjustedReroll = Math.min(adjustedReroll + 1, RANK_DICE[rank]);
+                for (let r = 0; r < modifiers.defenderRerolls; r++) {
+                    const reroll = rng.rollDice(RANK_DICE[rank]);
+                    let adjustedReroll = reroll;
+                    if (modifiers.defenderEfficiency) {
+                        adjustedReroll = Math.min(adjustedReroll + 1, RANK_DICE[rank]);
+                    }
+                    if (modifiers.defenderDefenseBonus > 0) {
+                        adjustedReroll = Math.min(adjustedReroll + modifiers.defenderDefenseBonus, RANK_DICE[rank]);
+                    }
+                    roll = Math.max(roll, adjustedReroll);
                 }
-                if (modifiers.defenderDefenseBonus > 0) {
-                    adjustedReroll = Math.min(adjustedReroll + modifiers.defenderDefenseBonus, RANK_DICE[rank]);
-                }
-                roll = Math.max(roll, adjustedReroll);
             }
 
             defenderRolls.push({ rank, roll });

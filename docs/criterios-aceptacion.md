@@ -16,11 +16,12 @@
 - Fortificación de territorios
 - Subida de nivel de Caminos
 
-### ✅ Zonas y Caminos
-- Zonas Especiales aplican efectos correctamente
-- Efectos se persisten durante la partida
-- Caminos con niveles N1–N3 operativos
-- Efectos de Caminos se aplican correctamente
+### ✅ Zonas y Caminos (Completado)
+- ✅ Zonas implementadas: ORO, BATALLA, AMURALLADA, DEFENSIVA, VELOZ, RECLUTAMIENTO
+- ✅ Caminos completos operativos: CLAN (N1-N3), TREASURE (N1-N3), POWER (N1-N3), LAND (N1-N3), WAR (N1-N3), LUCK (N1-N3)
+- ✅ Efectos implementados se aplican correctamente
+- ✅ Efecto Nivel 3 (+1 al dado atacando) implementado
+- ✅ WAR N3 (hasta 2 jefes simultáneos) implementado
 
 ### ✅ Razas y Jefes
 - Al menos 6 razas operativas con pasivas

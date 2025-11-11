@@ -65,8 +65,9 @@ export function calculateUnitCost(
     // Camino de la Tierra reduce costes
     const landLevel = player.paths[PathType.LAND];
     if (landLevel >= 1) {
-        // N1: -10% coste
-        return Math.floor(baseCost * 0.9);
+        // N1: -10% coste, N2: -15% coste, N3: -20% coste
+        const discount = landLevel === 1 ? 0.9 : landLevel === 2 ? 0.85 : 0.8;
+        return Math.floor(baseCost * discount);
     }
 
     return baseCost;
@@ -83,7 +84,7 @@ export function calculateActions(player: Player): number {
         actions += 1;
     }
 
-    // Zona Veloz: +1 Acción (se aplica al inicio del turno)
+    // Zona Veloz: +1 Acción (se aplica en endTurn cuando se calcula para el siguiente jugador)
     // Nota: esto se maneja en el GameState, no aquí
 
     // Camino del Clan N3: +1 Acción/turno
@@ -139,5 +140,16 @@ export function canDeployRank(
     }
 
     return false;
+}
+
+/**
+ * Obtiene el límite máximo de jefes para un jugador
+ * WAR N3 permite tener hasta 2 jefes, sin él solo 1
+ */
+export function getChiefLimit(player: Player): number {
+    if (player.paths[PathType.WAR] >= 3) {
+        return 2; // WAR N3: hasta 2 jefes
+    }
+    return 1; // Sin WAR N3: solo 1 jefe
 }
 

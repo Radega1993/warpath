@@ -17,7 +17,6 @@ class WebSocketService {
     private authSocket: Socket | null = null;
     private lobbySocket: Socket | null = null;
     private gameSocket: Socket | null = null;
-    private userId: string | null = null;
 
     // Auth namespace
     connectAuth() {
@@ -73,8 +72,8 @@ class WebSocketService {
         }
     }
 
-    setUserId(userId: string) {
-        this.userId = userId;
+    setUserId(_userId: string) {
+        // Método mantenido para compatibilidad, pero userId se obtiene del store
     }
 
     // Game namespace

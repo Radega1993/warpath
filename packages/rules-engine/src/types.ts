@@ -23,7 +23,7 @@ export const UNIT_LIMITS: Record<UnitRank, number> = {
     [UnitRank.WARRIOR]: 25,
     [UnitRank.ELITE]: 15,
     [UnitRank.HERO]: 10,
-    [UnitRank.CHIEF]: 1,
+    [UnitRank.CHIEF]: 2, // Máximo 2, pero solo 1 sin WAR N3
     [UnitRank.LEGEND]: 3
 };
 
@@ -99,6 +99,7 @@ export interface Player {
     seat: number;
     raceId: RaceType;
     heroId: HeroType;
+    secondHeroId?: HeroType; // WAR N3: segundo jefe activo
     gold: number;
     actions: number;
     actionsLeft: number;
@@ -157,5 +158,6 @@ export interface CombatModifiers {
     defenderRerolls: number;
     defenderDefenseBonus: number; // +2 de Amurallada
     maxTroopsPerSide?: number; // límite de Defensiva
+    luckBoostElites?: boolean; // Camino LUCK N3: boost a élites
 }
 

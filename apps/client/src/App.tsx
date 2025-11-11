@@ -3,6 +3,7 @@ import Home from './pages/Home';
 import Lobby from './pages/Lobby';
 import Room from './pages/Room';
 import Game from './pages/Game';
+import Results from './pages/Results';
 
 function App() {
     return (
@@ -12,6 +13,7 @@ function App() {
                 <Route path="/lobby" element={<Lobby />} />
                 <Route path="/room/:roomId" element={<Room />} />
                 <Route path="/game/:roomId" element={<Game />} />
+                <Route path="/results" element={<Results />} />
             </Routes>
         </BrowserRouter>
     );

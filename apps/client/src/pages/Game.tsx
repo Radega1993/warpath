@@ -1,13 +1,15 @@
 import { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { wsService } from '../services/websocket.service';
 import { useGameStore } from '../store/gameStore';
 import Map from '../components/Map';
 import GamePanel from '../components/GamePanel';
+import CombatLog from '../components/CombatLog';
 import { GameState, CombatResult } from '../types';
 
 export default function Game() {
     const { roomId } = useParams<{ roomId: string }>();
+    const navigate = useNavigate();
     const { setGameState, setLastCombatResult, setError } = useGameStore();
 
     useEffect(() => {
@@ -60,8 +62,9 @@ export default function Game() {
 
         // Listen for game over
         wsService.onGameOver((data) => {
-            alert(`¡Partida terminada! Ganador: ${data.winnerId}`);
+            console.log('Game over:', data);
             // Navigate to results page
+            navigate(`/results`);
         });
 
         // Listen for errors
@@ -83,14 +86,15 @@ export default function Game() {
                 </h1>
 
                 <div className="grid lg:grid-cols-4 gap-4">
-                    {/* Map - takes 3 columns */}
-                    <div className="lg:col-span-3">
+                    {/* Map - takes 2 columns */}
+                    <div className="lg:col-span-2">
                         <Map />
                     </div>
 
-                    {/* Game Panel - takes 1 column */}
-                    <div className="lg:col-span-1">
+                    {/* Game Panel and Combat Log - takes 2 columns */}
+                    <div className="lg:col-span-2 space-y-4">
                         <GamePanel />
+                        <CombatLog />
                     </div>
                 </div>
             </div>

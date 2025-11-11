@@ -21,6 +21,10 @@ interface GameStore {
     // UI state
     selectedTerritory: string | null;
     setSelectedTerritory: (territoryId: string | null) => void;
+    attackFrom: string | null;
+    setAttackFrom: (territoryId: string | null) => void;
+    fortifyFrom: string | null;
+    setFortifyFrom: (territoryId: string | null) => void;
 
     // Errors
     error: string | null;
@@ -53,6 +57,10 @@ export const useGameStore = create<GameStore>((set) => ({
 
     selectedTerritory: null,
     setSelectedTerritory: (territoryId) => set({ selectedTerritory: territoryId }),
+    attackFrom: null,
+    setAttackFrom: (territoryId) => set({ attackFrom: territoryId }),
+    fortifyFrom: null,
+    setFortifyFrom: (territoryId) => set({ fortifyFrom: territoryId }),
 
     error: null,
     setError: (error) => set({ error }),
@@ -63,6 +71,8 @@ export const useGameStore = create<GameStore>((set) => ({
             gameState: null,
             lastCombatResult: null,
             selectedTerritory: null,
+            attackFrom: null,
+            fortifyFrom: null,
             error: null,
         }),
 }));

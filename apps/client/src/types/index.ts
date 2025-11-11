@@ -94,11 +94,23 @@ export interface RoomState {
 }
 
 export interface CombatResult {
-    attackerRolls: Array<{ rank: string; roll: number }>;
-    defenderRolls: Array<{ rank: string; roll: number }>;
-    attackerLosses: Record<string, number>;
-    defenderLosses: Record<string, number>;
+    rolls?: {
+        attacker: Array<{ rank: string; roll: number }>;
+        defender: Array<{ rank: string; roll: number }>;
+    };
+    attackerRolls?: Array<{ rank: string; roll: number }>;
+    defenderRolls?: Array<{ rank: string; roll: number }>;
+    modifiersApplied?: {
+        attacker: string[];
+        defender: string[];
+    };
+    losses?: {
+        attacker: Record<string, number>;
+        defender: Record<string, number>;
+    };
+    attackerLosses?: Record<string, number>;
+    defenderLosses?: Record<string, number>;
     conquest: boolean;
-    totalDamage: number;
+    totalDamage?: number;
 }
 

@@ -45,37 +45,54 @@ Lanzar en producción un MVP jugable online (web-first) con partidas de 2–4 ju
 
 ---
 
-### Semana 3 — Frontend mapa + flujo de turno
+### Semana 3 — Frontend mapa + flujo de turno ✅ COMPLETADA
 
 **Objetivo:** Interfaz jugable mínima.
 
 **Tareas principales:**
-- **Pantallas:** Home, Lobby, Sala, Partida, Resultados
-- **Render mapa (SVG/Pixi):** color por propietario, número de tropas, highlight de adyacencia
-- **Panel lateral:** oro, acciones, camino/raza/jefe, temporizador, log de combate
-- **Interacciones:** Desplegar, Atacar, Fortificar, Subir Camino
-- Log de combate y toast de errores del servidor
-- Autenticación "guest" + handle
+- ✅ **Pantallas:** Home, Lobby, Sala, Partida, Resultados
+- ✅ **Render mapa (SVG):** color por propietario, número de tropas, highlight de adyacencia
+- ✅ **Panel lateral:** oro, acciones, camino/raza/jefe, temporizador, log de combate
+- ✅ **Interacciones:** Desplegar, Atacar, Fortificar, Subir Camino, Terminar Turno
+- ✅ Log de combate (CombatLog component)
+- ✅ Autenticación "guest" + handle
+- ✅ Identificación correcta del jugador actual por userId
+- ✅ Mapeo correcto de owners usando userId
 
 **Entregables:**
 - ✅ Partida jugable end-to-end entre 2 navegadores locales
+- ✅ Todas las interacciones del juego funcionando
+- ✅ Pantalla de resultados implementada
 
 ---
 
-### Semana 4 — Economía, Zonas y Caminos
+### Semana 4 — Economía, Zonas y Caminos ✅ COMPLETADA
 
 **Objetivo:** Profundidad estratégica inicial.
 
 **Tareas principales:**
-- **Economía:** +50 oro/territorio por turno + Zonas Especiales
-- Implementar 6 Caminos con efectos de N1–N3
-- **Zonas:** Oro, Veloz, Batalla, Amurallada, Defensiva, Reclutamiento (según reglas)
-- Reglas de nivel de Clan y gates de rangos (Élite/Héroe/Leyenda)
-- Balance inicial via balance.json (feature flags)
+- ✅ **Economía:** +50 oro/territorio por turno + Zonas Especiales (implementado)
+- ✅ Implementar 6 Caminos con efectos de N1–N3:
+  - ✅ CLAN (N1-N3): Implementado
+  - ✅ TREASURE (N1-N3): Implementado
+  - ✅ POWER (N1-N3): Implementado
+  - ✅ LAND (N1-N3): Implementado (N1: -10%, N2: -15%, N3: -20% + tropa gratis)
+  - ✅ WAR (N1-N3): Implementado (N1: Eficacia, N2: +1 Acción, N3: hasta 2 jefes)
+  - ✅ LUCK (N1-N3): Implementado (N1: +1 reroll, N2: +1 defensa, N3: boost élites)
+- ✅ **Zonas:** 
+  - ✅ Oro: Implementado (+150 oro)
+  - ✅ Batalla: Implementado (eficacia defensor)
+  - ✅ Amurallada: Implementado (+2 defensa)
+  - ✅ Defensiva: Implementado (límite 10 tropas)
+  - ✅ Veloz: Implementado (+1 Acción en endTurn)
+  - ✅ Reclutamiento: Implementado (+1 tropa gratis, +2 con LAND N3)
+- ✅ Reglas de nivel de Clan y gates de rangos (Élite/Héroe/Leyenda)
+- ✅ Efecto Nivel 3: +1 al dado atacando (implementado)
+- ✅ Balance inicial via balance.json (creado)
 
 **Entregables:**
-- ✅ Métricas por camino/raza/jefe (winrate, oro/turno, duración)
-- ✅ Pruebas de simulación con bots simples
+- ⏳ Métricas por camino/raza/jefe (winrate, oro/turno, duración)
+- ⏳ Pruebas de simulación con bots simples
 
 ---
 
