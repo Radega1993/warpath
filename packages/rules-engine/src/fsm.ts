@@ -13,6 +13,7 @@ import { SeededRNG } from './rng';
 import { resolveCombat, createEmptyTroops, sumTroops } from './combat';
 import { calculateIncome, calculateActions, canAffordUnit, canDeployRank, calculateUnitCost, getChiefLimit } from './economy';
 import { CombatModifiers } from './types';
+import { GameConfig, DEFAULT_CONFIG } from './config';
 
 /**
  * Máquina de estados finitos (FSM) para el juego
@@ -20,10 +21,12 @@ import { CombatModifiers } from './types';
 export class GameFSM {
     private state: GameState;
     private rng: SeededRNG;
+    private config: GameConfig;
 
-    constructor(state: GameState) {
+    constructor(state: GameState, config: GameConfig = DEFAULT_CONFIG) {
         this.state = state;
         this.rng = new SeededRNG(state.seed);
+        this.config = config;
     }
 
     /**
@@ -55,15 +58,17 @@ export class GameFSM {
             if (spawnTerritories[index]) {
                 const spawn = spawnTerritories[index];
                 spawn.ownerId = player.id;
-                spawn.troops = { ...createEmptyTroops(), [UnitRank.WARRIOR]: 3 };
+                spawn.troops = { ...createEmptyTroops(), [UnitRank.EXPLORER]: 1 };
                 player.territories.push(spawn.id);
             }
         });
 
         // Inicializar oro y acciones
+        const startingGold = this.config.gameSettings?.startingGold ?? 200;
+        const startingActions = this.config.gameSettings?.startingActions ?? 1;
         players.forEach(player => {
-            player.gold = 200; // Oro inicial
-            player.actions = calculateActions(player);
+            player.gold = startingGold;
+            player.actions = calculateActions(player, this.config);
             player.actionsLeft = player.actions;
         });
 
@@ -120,7 +125,7 @@ export class GameFSM {
                 }
             }
 
-            const chiefLimit = getChiefLimit(player);
+            const chiefLimit = getChiefLimit(player, this.config);
             const newChiefCount = currentChiefs + troops[UnitRank.CHIEF];
 
             if (newChiefCount > chiefLimit) {
@@ -153,11 +158,11 @@ export class GameFSM {
                 remainingFreeUnits -= freeForThisRank;
             }
 
-            if (unitsToPay > 0 && !canAffordUnit(player, rank, unitsToPay)) {
+            if (unitsToPay > 0 && !canAffordUnit(player, rank, unitsToPay, this.config)) {
                 throw new Error(`Cannot afford ${unitsToPay} ${rank}`);
             }
 
-            totalCost += calculateUnitCost(rank, player) * unitsToPay;
+            totalCost += calculateUnitCost(rank, player, this.config) * unitsToPay;
         }
 
         // Aplicar despliegue
@@ -212,7 +217,7 @@ export class GameFSM {
         const modifiers = this.calculateCombatModifiers(player, toTerritory);
 
         // Resolver combate
-        const result = resolveCombat(attackerCommits, defenderCommits, modifiers, this.rng);
+        const result = resolveCombat(attackerCommits, defenderCommits, modifiers, this.rng, this.config);
 
         // Aplicar pérdidas
         for (const rank of Object.keys(result.attackerLosses) as UnitRank[]) {
@@ -236,6 +241,10 @@ export class GameFSM {
                     oldOwner.territories = oldOwner.territories.filter(id => id !== toId);
                 }
             }
+
+            // Limpiar bonificaciones del territorio conquistado
+            toTerritory.reinforced = false;
+            toTerritory.consolidated = false;
 
             toTerritory.ownerId = player.id;
             player.territories.push(toId);
@@ -289,6 +298,184 @@ export class GameFSM {
         }
 
         player.actionsLeft--;
+        this.checkPhaseEnd();
+    }
+
+    /**
+     * Mueve todas las tropas hasta 4 territorios del Clan (1 Acción/Todas las tropas)
+     */
+    moveTroops(movements: Array<{ fromId: string; toId: string; troops: Troops }>): void {
+        if (this.state.phase !== GamePhase.DEPLOY && this.state.phase !== GamePhase.FORTIFY) {
+            throw new Error('Can only move troops in DEPLOY or FORTIFY phase');
+        }
+
+        const player = this.state.players[this.state.currentPlayerId];
+        if (!player) {
+            throw new Error('Current player not found');
+        }
+
+        // Validar máximo 4 territorios destino
+        const uniqueDestinations = new Set(movements.map(m => m.toId));
+        if (uniqueDestinations.size > 4) {
+            throw new Error('Cannot move to more than 4 territories');
+        }
+
+        // Validar que todos los territorios origen y destino son del jugador
+        for (const movement of movements) {
+            const fromTerritory = this.state.territories[movement.fromId];
+            const toTerritory = this.state.territories[movement.toId];
+
+            if (!fromTerritory || !toTerritory) {
+                throw new Error('Territory not found');
+            }
+
+            if (fromTerritory.ownerId !== player.id || toTerritory.ownerId !== player.id) {
+                throw new Error('Can only move between own territories');
+            }
+
+            // Validar que hay tropas suficientes
+            for (const rank of Object.keys(movement.troops) as UnitRank[]) {
+                if (movement.troops[rank] > fromTerritory.troops[rank]) {
+                    throw new Error(`Not enough ${rank} troops in territory ${movement.fromId}`);
+                }
+            }
+        }
+
+        // Aplicar todos los movimientos
+        for (const movement of movements) {
+            const fromTerritory = this.state.territories[movement.fromId];
+            const toTerritory = this.state.territories[movement.toId];
+
+            for (const rank of Object.keys(movement.troops) as UnitRank[]) {
+                fromTerritory.troops[rank] -= movement.troops[rank];
+                toTerritory.troops[rank] += movement.troops[rank];
+            }
+        }
+
+        // Solo consume 1 acción total (no por movimiento)
+        player.actionsLeft--;
+        this.checkPhaseEnd();
+    }
+
+    /**
+     * Reforza un territorio: +1 a dados (Eficacia) de defensa hasta que el Clan pierda el territorio
+     */
+    reinforceTerritory(territoryId: string): void {
+        if (this.state.phase !== GamePhase.DEPLOY && this.state.phase !== GamePhase.ATTACK) {
+            throw new Error('Can only reinforce in DEPLOY or ATTACK phase');
+        }
+
+        const player = this.state.players[this.state.currentPlayerId];
+        if (!player) {
+            throw new Error('Current player not found');
+        }
+
+        const territory = this.state.territories[territoryId];
+        if (!territory) {
+            throw new Error('Territory not found');
+        }
+
+        if (territory.ownerId !== player.id) {
+            throw new Error('Can only reinforce own territories');
+        }
+
+        if (territory.reinforced) {
+            throw new Error('Territory is already reinforced');
+        }
+
+        territory.reinforced = true;
+        player.actionsLeft--;
+        this.checkPhaseEnd();
+    }
+
+    /**
+     * Utiliza una Zona Especial (Zona de Oro o Zona de Reclutamiento)
+     */
+    useZone(territoryId: string): void {
+        if (this.state.phase !== GamePhase.DEPLOY && this.state.phase !== GamePhase.ATTACK) {
+            throw new Error('Can only use zones in DEPLOY or ATTACK phase');
+        }
+
+        const player = this.state.players[this.state.currentPlayerId];
+        if (!player) {
+            throw new Error('Current player not found');
+        }
+
+        const territory = this.state.territories[territoryId];
+        if (!territory) {
+            throw new Error('Territory not found');
+        }
+
+        if (territory.ownerId !== player.id) {
+            throw new Error('Can only use zones in own territories');
+        }
+
+        // Validar que es una zona activable
+        if (territory.zone !== ZoneType.GOLD && territory.zone !== ZoneType.RECRUITMENT) {
+            throw new Error('Only Gold and Recruitment zones can be activated');
+        }
+
+        // Verificar si ya se usó esta zona (una vez por turno/partida según reglas)
+        if (!player.usedZones) {
+            player.usedZones = [];
+        }
+
+        // Permitir usar la misma zona múltiples veces si el héroe es DOMINATOR
+        const canReuse = player.heroId === HeroType.DOMINATOR;
+
+        if (!canReuse && player.usedZones.includes(territoryId)) {
+            throw new Error('Zone already used this turn');
+        }
+
+        // Aplicar efecto de la zona
+        if (territory.zone === ZoneType.GOLD) {
+            // Zona de Oro: bonificación de oro inmediata
+            const goldBonus = this.config.zones.gold?.incomeBonus || 150;
+            player.gold += goldBonus;
+        } else if (territory.zone === ZoneType.RECRUITMENT) {
+            // Zona de Reclutamiento: ya se aplica automáticamente al desplegar
+            // Pero si se activa explícitamente, podría dar una bonificación adicional
+            // Por ahora, solo marcamos como usada
+        }
+
+        // Marcar como usada
+        if (!canReuse) {
+            player.usedZones.push(territoryId);
+        }
+
+        player.actionsLeft--;
+        this.checkPhaseEnd();
+    }
+
+    /**
+     * Consolida un territorio: +2 dados (Dos Exploradores) en la próxima defensa hasta que el Clan pierda el territorio
+     */
+    consolidateTerritory(territoryId: string): void {
+        if (this.state.phase !== GamePhase.DEPLOY && this.state.phase !== GamePhase.ATTACK) {
+            throw new Error('Can only consolidate in DEPLOY or ATTACK phase');
+        }
+
+        const player = this.state.players[this.state.currentPlayerId];
+        if (!player) {
+            throw new Error('Current player not found');
+        }
+
+        const territory = this.state.territories[territoryId];
+        if (!territory) {
+            throw new Error('Territory not found');
+        }
+
+        if (territory.ownerId !== player.id) {
+            throw new Error('Can only consolidate own territories');
+        }
+
+        if (territory.consolidated) {
+            throw new Error('Territory is already consolidated');
+        }
+
+        territory.consolidated = true;
+        player.actionsLeft--;
+        this.checkPhaseEnd();
     }
 
     /**
@@ -334,7 +521,7 @@ export class GameFSM {
         }
 
         // Calcular ingresos
-        const income = calculateIncome(player, this.state.territories);
+        const income = calculateIncome(player, this.state.territories, this.config);
         player.gold += income;
 
         // Pasar al siguiente jugador
@@ -348,13 +535,14 @@ export class GameFSM {
         this.state.phase = GamePhase.DEPLOY;
 
         // Resetear acciones
-        nextPlayer.actions = calculateActions(nextPlayer);
+        nextPlayer.actions = calculateActions(nextPlayer, this.config);
 
         // Zona Veloz: +1 Acción adicional
         for (const territoryId of nextPlayer.territories) {
             const territory = this.state.territories[territoryId];
-            if (territory?.zone === ZoneType.FAST) {
-                nextPlayer.actions += 1;
+            if (territory?.zone === ZoneType.FAST && this.config.zones.fast?.actionBonus) {
+                nextPlayer.actions += this.config.zones.fast.actionBonus;
+                nextPlayer.actionsLeft += this.config.zones.fast.actionBonus;
                 break; // Solo una vez por jugador
             }
         }
@@ -379,7 +567,9 @@ export class GameFSM {
             defenderRerolls: 0,
             defenderDefenseBonus: 0,
             maxTroopsPerSide: undefined,
-            luckBoostElites: false
+            luckBoostElites: false,
+            defenderReinforced: false,
+            defenderConsolidated: false
         };
 
         // Eficacia del atacante
@@ -430,7 +620,44 @@ export class GameFSM {
             modifiers.maxTroopsPerSide = 10;
         }
 
+        // Reforzar: +1 eficacia defensa
+        if (defenderTerritory.reinforced) {
+            modifiers.defenderReinforced = true;
+            modifiers.defenderEfficiency = true; // Aplicar eficacia
+        }
+
+        // Consolidar: +2 dados (2 exploradores) en defensa
+        if (defenderTerritory.consolidated) {
+            modifiers.defenderConsolidated = true;
+        }
+
         return modifiers;
+    }
+
+    /**
+     * Verifica si la fase actual ha terminado
+     */
+    private checkPhaseEnd(): void {
+        const player = this.state.players[this.state.currentPlayerId];
+        if (!player) return;
+
+        // Si no quedan acciones, pasar a la siguiente fase
+        if (player.actionsLeft <= 0) {
+            switch (this.state.phase) {
+                case GamePhase.DEPLOY:
+                    this.state.phase = GamePhase.ATTACK;
+                    break;
+                case GamePhase.ATTACK:
+                    this.state.phase = GamePhase.FORTIFY;
+                    break;
+                case GamePhase.FORTIFY:
+                    // Si no hay más acciones en fortify, el turno termina
+                    this.endTurn();
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 
     /**

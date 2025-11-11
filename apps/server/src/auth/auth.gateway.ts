@@ -16,9 +16,14 @@ export class AuthGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     constructor(private authService: AuthService) { }
 
-    handleConnection(client: AuthenticatedSocket) {
+    async handleConnection(client: AuthenticatedSocket) {
         // Generar ID de usuario para guest mode
-        client.userId = this.authService.generateUserId();
+        const userId = this.authService.generateUserId();
+        client.userId = userId;
+
+        // Crear o obtener usuario invitado en la BD
+        await this.authService.getOrCreateGuestUser(userId, `Guest_${userId.substring(0, 8)}`);
+
         console.log(`Client connected: ${client.id} (userId: ${client.userId})`);
 
         // Enviar userId al cliente

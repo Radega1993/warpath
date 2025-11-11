@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '../config/config.service';
 
 export interface Timer {
     roomId: string;
@@ -11,18 +12,41 @@ export interface Timer {
 @Injectable()
 export class TimerService {
     private timers: Map<string, Timer> = new Map();
-    private readonly DEFAULT_TURN_TIME = 120; // 2 minutos por turno
+    private defaultTurnTime: number = 120;
+
+    constructor(private configService: ConfigService) {
+        // Cargar de forma asíncrona
+        this.loadDefaultTurnTime().catch(err => {
+            console.error('Error loading default turn time:', err);
+        });
+    }
+
+    private async loadDefaultTurnTime() {
+        try {
+            const config = await this.configService.getConfig();
+            this.defaultTurnTime = config.gameSettings?.defaultTurnTime || 120;
+        } catch (error) {
+            // Si falla, usar valor por defecto
+            this.defaultTurnTime = 120;
+        }
+    }
+
+    private getDefaultTurnTime(): number {
+        return this.defaultTurnTime;
+    }
 
     /**
      * Inicia un timer para una sala
      */
-    startTimer(roomId: string, seconds: number = this.DEFAULT_TURN_TIME, onTick?: (secondsLeft: number) => void, onExpire?: () => void): void {
+    startTimer(roomId: string, seconds?: number, onTick?: (secondsLeft: number) => void, onExpire?: () => void): void {
+        const defaultTime = this.getDefaultTurnTime();
+        const timerSeconds = seconds ?? defaultTime;
         // Detener timer existente si hay uno
         this.stopTimer(roomId);
 
         const timer: Timer = {
             roomId,
-            secondsLeft: seconds,
+            secondsLeft: timerSeconds,
             onTick,
             onExpire,
         };
@@ -70,7 +94,7 @@ export class TimerService {
     resetTimer(roomId: string, seconds?: number): void {
         const timer = this.timers.get(roomId);
         if (timer) {
-            timer.secondsLeft = seconds || this.DEFAULT_TURN_TIME;
+            timer.secondsLeft = seconds || this.getDefaultTurnTime();
         }
     }
 }

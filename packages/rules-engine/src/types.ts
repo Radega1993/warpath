@@ -106,6 +106,7 @@ export interface Player {
     clanLevel: 1 | 2 | 3;
     paths: Record<PathType, PathLevel>;
     territories: string[]; // IDs de territorios controlados
+    usedZones?: string[]; // IDs de territorios con zonas ya utilizadas este turno/partida
 }
 
 // Estado de un territorio
@@ -115,6 +116,8 @@ export interface TerritoryState {
     troops: Troops;
     zone?: ZoneType | string; // Permite string para compatibilidad con JSON
     isSpawn: boolean;
+    reinforced?: boolean; // Reforzado: +1 eficacia defensa hasta perder territorio
+    consolidated?: boolean; // Consolidado: +2 dados (2 exploradores) en próxima defensa hasta perder territorio
 }
 
 // Fases del juego
@@ -159,5 +162,7 @@ export interface CombatModifiers {
     defenderDefenseBonus: number; // +2 de Amurallada
     maxTroopsPerSide?: number; // límite de Defensiva
     luckBoostElites?: boolean; // Camino LUCK N3: boost a élites
+    defenderReinforced?: boolean; // Reforzado: +1 eficacia defensa
+    defenderConsolidated?: boolean; // Consolidado: +2 dados (2 exploradores) en defensa
 }
 

@@ -1,0 +1,7 @@
+# Hoist solo las dependencias de testing necesarias para Jest
+public-hoist-pattern[]=*jest*
+public-hoist-pattern[]=*ts-jest*
+public-hoist-pattern[]=*@swc/*
+# Permitir que cada workspace instale sus propias dependencias
+# El frontend necesita vite y react en su propio node_modules
+

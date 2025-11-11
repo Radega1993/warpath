@@ -6,6 +6,7 @@ import {
     ConnectedSocket,
     OnGatewayConnection,
 } from '@nestjs/websockets';
+import { UseGuards } from '@nestjs/common';
 import { Server } from 'socket.io';
 import { Inject, forwardRef } from '@nestjs/common';
 import { RoomsService, RoomStatus } from './rooms.service';
@@ -14,7 +15,10 @@ import { UsersService } from '../users/users.service';
 import { GameService } from '../game/game.service';
 import { TelemetryService } from '../telemetry/telemetry.service';
 import { TimerService } from '../game/timer.service';
+import { RateLimitGuard } from '../common/rate-limit.guard';
+import { captureWebSocketError } from '../common/sentry.helper';
 import { AuthenticatedSocket, CreateRoomDto, JoinRoomDto, PickFactionDto, PickHeroDto } from '../common/types';
+import { RaceType, HeroType } from '@warpath/rules-engine';
 import { z } from 'zod';
 
 const createRoomSchema = z.object({
@@ -28,11 +32,11 @@ const joinRoomSchema = z.object({
 });
 
 const pickFactionSchema = z.object({
-    raceId: z.string(),
+    raceId: z.string().transform((val) => val.toLowerCase()),
 });
 
 const pickHeroSchema = z.object({
-    heroId: z.string(),
+    heroId: z.string().transform((val) => val.toLowerCase()),
 });
 
 @WebSocketGateway({
@@ -59,7 +63,7 @@ export class RoomsGateway implements OnGatewayConnection {
     handleConnection(client: AuthenticatedSocket) {
         // Intentar obtener userId de los query parameters
         const queryUserId = (client.handshake.query?.userId as string) || null;
-        
+
         // Asignar userId automáticamente si no existe (guest mode)
         if (!client.userId) {
             if (queryUserId) {
@@ -82,7 +86,8 @@ export class RoomsGateway implements OnGatewayConnection {
     }
 
     @SubscribeMessage('create_room')
-    handleCreateRoom(
+    @UseGuards(RateLimitGuard)
+    async handleCreateRoom(
         @ConnectedSocket() client: AuthenticatedSocket,
         @MessageBody() data: CreateRoomDto,
     ) {
@@ -97,14 +102,14 @@ export class RoomsGateway implements OnGatewayConnection {
 
             console.log(`[RoomsGateway] create_room: Client ${client.id} (userId: ${client.userId}) creating room`);
 
-            const room = this.roomsService.createRoom(validated.mode, validated.maxPlayers, client.userId);
+            const room = await this.roomsService.createRoom(validated.mode, validated.maxPlayers, client.userId);
 
             // Unir al cliente a la sala
             client.join(room.id);
             client.roomId = room.id;
 
             // Añadir jugador a la sala
-            const player = this.roomsService.addPlayer(room.id, client.userId, 'Player');
+            const player = await this.roomsService.addPlayer(room.id, client.userId, 'Player');
             if (!player) {
                 client.emit('error', { code: 'ROOM_FULL', message: 'Room is full' });
                 return;
@@ -120,12 +125,17 @@ export class RoomsGateway implements OnGatewayConnection {
                 this.broadcastRoomUpdate(room.id);
             }, 10);
         } catch (error) {
+            captureWebSocketError(error, {
+                action: 'create_room',
+                userId: client.userId || 'unknown',
+            });
             client.emit('error', { code: 'VALIDATION_ERROR', message: error.message });
         }
     }
 
     @SubscribeMessage('join_room')
-    handleJoinRoom(
+    @UseGuards(RateLimitGuard)
+    async handleJoinRoom(
         @ConnectedSocket() client: AuthenticatedSocket,
         @MessageBody() data: JoinRoomDto,
     ) {
@@ -143,7 +153,7 @@ export class RoomsGateway implements OnGatewayConnection {
                 return;
             }
 
-            const room = this.roomsService.getRoom(validated.roomId);
+            const room = await this.roomsService.getRoom(validated.roomId);
             if (!room) {
                 client.emit('error', { code: 'ROOM_NOT_FOUND', message: 'Room not found' });
                 return;
@@ -160,7 +170,7 @@ export class RoomsGateway implements OnGatewayConnection {
             client.roomId = room.id;
 
             // Añadir jugador a la sala
-            const player = this.roomsService.addPlayer(room.id, client.userId, validated.handle);
+            const player = await this.roomsService.addPlayer(room.id, client.userId, validated.handle);
             if (!player) {
                 client.emit('error', { code: 'ROOM_FULL', message: 'Room is full' });
                 return;
@@ -171,27 +181,33 @@ export class RoomsGateway implements OnGatewayConnection {
 
             this.broadcastRoomUpdate(room.id);
         } catch (error) {
+            captureWebSocketError(error, {
+                action: 'join_room',
+                userId: client.userId || 'unknown',
+            });
             client.emit('error', { code: 'VALIDATION_ERROR', message: error.message });
         }
     }
 
     @SubscribeMessage('leave_room')
-    handleLeaveRoom(@ConnectedSocket() client: AuthenticatedSocket) {
+    async handleLeaveRoom(@ConnectedSocket() client: AuthenticatedSocket) {
         if (!client.userId || !client.roomId) {
             return;
         }
 
-        const room = this.roomsService.getRoom(client.roomId);
+        const room = await this.roomsService.getRoom(client.roomId);
         if (room) {
-            this.roomsService.removePlayer(client.roomId, client.userId);
+            await this.roomsService.removePlayer(client.roomId, client.userId);
             client.leave(client.roomId);
+            const roomId = client.roomId;
             client.roomId = undefined;
-            this.broadcastRoomUpdate(client.roomId);
+            this.broadcastRoomUpdate(roomId);
         }
     }
 
     @SubscribeMessage('pick_faction')
-    handlePickFaction(
+    @UseGuards(RateLimitGuard)
+    async handlePickFaction(
         @ConnectedSocket() client: AuthenticatedSocket,
         @MessageBody() data: PickFactionDto,
     ) {
@@ -203,7 +219,13 @@ export class RoomsGateway implements OnGatewayConnection {
                 return;
             }
 
-            const success = this.roomsService.pickFaction(client.roomId, client.userId, validated.raceId as any);
+            // Validar que el raceId sea un valor válido del enum
+            if (!Object.values(RaceType).includes(validated.raceId as RaceType)) {
+                client.emit('error', { code: 'INVALID_RACE', message: 'Invalid race ID' });
+                return;
+            }
+
+            const success = await this.roomsService.pickFaction(client.roomId, client.userId, validated.raceId as RaceType);
             if (!success) {
                 client.emit('error', { code: 'PICK_FAILED', message: 'Failed to pick faction' });
                 return;
@@ -211,12 +233,18 @@ export class RoomsGateway implements OnGatewayConnection {
 
             this.broadcastRoomUpdate(client.roomId);
         } catch (error) {
+            captureWebSocketError(error, {
+                action: 'pick_faction',
+                roomId: client.roomId || 'unknown',
+                userId: client.userId || 'unknown',
+            });
             client.emit('error', { code: 'VALIDATION_ERROR', message: error.message });
         }
     }
 
     @SubscribeMessage('pick_hero')
-    handlePickHero(
+    @UseGuards(RateLimitGuard)
+    async handlePickHero(
         @ConnectedSocket() client: AuthenticatedSocket,
         @MessageBody() data: PickHeroDto,
     ) {
@@ -228,7 +256,13 @@ export class RoomsGateway implements OnGatewayConnection {
                 return;
             }
 
-            const success = this.roomsService.pickHero(client.roomId, client.userId, validated.heroId as any);
+            // Validar que el heroId sea un valor válido del enum
+            if (!Object.values(HeroType).includes(validated.heroId as HeroType)) {
+                client.emit('error', { code: 'INVALID_HERO', message: 'Invalid hero ID' });
+                return;
+            }
+
+            const success = await this.roomsService.pickHero(client.roomId, client.userId, validated.heroId as HeroType);
             if (!success) {
                 client.emit('error', { code: 'PICK_FAILED', message: 'Failed to pick hero' });
                 return;
@@ -236,12 +270,18 @@ export class RoomsGateway implements OnGatewayConnection {
 
             this.broadcastRoomUpdate(client.roomId);
         } catch (error) {
+            captureWebSocketError(error, {
+                action: 'pick_hero',
+                roomId: client.roomId || 'unknown',
+                userId: client.userId || 'unknown',
+            });
             client.emit('error', { code: 'VALIDATION_ERROR', message: error.message });
         }
     }
 
     @SubscribeMessage('set_ready')
-    handleSetReady(
+    @UseGuards(RateLimitGuard)
+    async handleSetReady(
         @ConnectedSocket() client: AuthenticatedSocket,
         @MessageBody() data: { ready: boolean },
     ) {
@@ -250,7 +290,7 @@ export class RoomsGateway implements OnGatewayConnection {
             return;
         }
 
-        const room = this.roomsService.getRoom(client.roomId);
+        const room = await this.roomsService.getRoom(client.roomId);
         if (!room) {
             client.emit('error', { code: 'ROOM_NOT_FOUND', message: 'Room not found' });
             return;
@@ -268,7 +308,7 @@ export class RoomsGateway implements OnGatewayConnection {
             return;
         }
 
-        const success = this.roomsService.setPlayerReady(client.roomId, client.userId, data.ready);
+        const success = await this.roomsService.setPlayerReady(client.roomId, client.userId, data.ready);
         if (!success) {
             client.emit('error', { code: 'SET_READY_FAILED', message: 'Failed to set ready status' });
             return;
@@ -278,13 +318,14 @@ export class RoomsGateway implements OnGatewayConnection {
     }
 
     @SubscribeMessage('start_match')
-    handleStartMatch(@ConnectedSocket() client: AuthenticatedSocket) {
+    @UseGuards(RateLimitGuard)
+    async handleStartMatch(@ConnectedSocket() client: AuthenticatedSocket) {
         if (!client.userId || !client.roomId) {
             client.emit('error', { code: 'UNAUTHORIZED', message: 'Not in a room' });
             return;
         }
 
-        const room = this.roomsService.getRoom(client.roomId);
+        const room = await this.roomsService.getRoom(client.roomId);
         if (!room) {
             client.emit('error', { code: 'ROOM_NOT_FOUND', message: 'Room not found' });
             return;
@@ -321,8 +362,14 @@ export class RoomsGateway implements OnGatewayConnection {
                 player.ready = true;
             }
         });
+        // Actualizar el estado de ready en la base de datos
+        for (const player of room.players) {
+            if (player.raceId) {
+                await this.roomsService.setPlayerReady(client.roomId, player.userId, true);
+            }
+        }
 
-        const success = this.roomsService.startMatch(client.roomId);
+        const success = await this.roomsService.startMatch(client.roomId);
         if (!success) {
             console.log(`[RoomsGateway] start_match: Failed to start match for room ${client.roomId}`);
             client.emit('error', { code: 'START_FAILED', message: 'Failed to start match' });
@@ -332,7 +379,7 @@ export class RoomsGateway implements OnGatewayConnection {
         console.log(`[RoomsGateway] start_match: Successfully started match for room ${client.roomId}`);
 
         // Iniciar el juego
-        const fsm = this.gameService.startGame(client.roomId);
+        const fsm = await this.gameService.startGame(client.roomId);
         if (!fsm) {
             client.emit('error', { code: 'GAME_START_FAILED', message: 'Failed to start game' });
             return;
@@ -357,17 +404,17 @@ export class RoomsGateway implements OnGatewayConnection {
         );
 
         // Emitir estado inicial del juego
-        const gameState = this.gameService.serializeGameState(fsm);
+        const serializedState = this.gameService.serializeGameState(fsm);
         const secondsLeft = this.timerService.getSecondsLeft(client.roomId);
-        gameState.timers.turnSecondsLeft = secondsLeft;
-        console.log(`[RoomsGateway] Emitting initial game_state to /room/${client.roomId}:`, gameState);
-        this.server.to(`/room/${client.roomId}`).emit('game_state', gameState);
+        serializedState.timers.turnSecondsLeft = secondsLeft;
+        console.log(`[RoomsGateway] Emitting initial game_state to /room/${client.roomId}:`, serializedState);
+        this.server.to(`/room/${client.roomId}`).emit('game_state', serializedState);
 
         this.broadcastRoomUpdate(client.roomId);
     }
 
-    private broadcastRoomUpdate(roomId: string) {
-        const room = this.roomsService.getRoom(roomId);
+    private async broadcastRoomUpdate(roomId: string) {
+        const room = await this.roomsService.getRoom(roomId);
         if (!room) {
             console.log(`[RoomsGateway] broadcastRoomUpdate: Room ${roomId} not found`);
             return;

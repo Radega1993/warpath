@@ -7,46 +7,46 @@ import {
     UNIT_COSTS,
     UnitRank
 } from './types';
+import { GameConfig, DEFAULT_CONFIG } from './config';
 
 /**
  * Calcula los ingresos de oro de un jugador
  */
 export function calculateIncome(
     player: Player,
-    territories: Record<string, TerritoryState>
+    territories: Record<string, TerritoryState>,
+    config: GameConfig = DEFAULT_CONFIG
 ): number {
     let income = 0;
 
-    // Base: 50 oro por territorio
+    // Base: oro por territorio desde config
     const territoryCount = player.territories.length;
-    income += territoryCount * 50;
+    const baseIncome = config.economy.baseIncomePerTerritory;
+    income += territoryCount * baseIncome;
 
     // Bonificación de Jefe Comerciante
     if (player.heroId === HeroType.MERCHANT) {
-        income += territoryCount * 50;
+        income += territoryCount * config.economy.merchantHeroBonus;
     }
 
     // Bonificaciones de Zonas
     for (const territoryId of player.territories) {
         const territory = territories[territoryId];
         if (territory?.zone === ZoneType.GOLD || territory?.zone === 'oro') {
-            income += 150; // Zona Oro: +150
+            income += config.zones.gold?.incomeBonus || 150;
         }
     }
 
     // Bonificaciones de Camino del Tesoro
     const treasureLevel = player.paths[PathType.TREASURE];
-    if (treasureLevel >= 1) {
-        // N1: +25 oro/territorio
-        income += territoryCount * 25;
+    if (treasureLevel >= 1 && config.paths.treasure?.n1) {
+        income += territoryCount * (config.paths.treasure.n1.incomePerTerritory || 25);
     }
-    if (treasureLevel >= 2) {
-        // N2: +125 oro adicional (bonus plano)
-        income += 125;
+    if (treasureLevel >= 2 && config.paths.treasure?.n2) {
+        income += config.paths.treasure.n2.flatIncomeBonus || 125;
     }
-    if (treasureLevel >= 3) {
-        // N3: +300 oro adicional (bonus plano)
-        income += 300;
+    if (treasureLevel >= 3 && config.paths.treasure?.n3) {
+        income += config.paths.treasure.n3.flatIncomeBonus || 300;
     }
 
     return income;
@@ -57,16 +57,19 @@ export function calculateIncome(
  */
 export function calculateUnitCost(
     rank: UnitRank | string,
-    player: Player
+    player: Player,
+    config: GameConfig = DEFAULT_CONFIG
 ): number {
-    const baseCost = UNIT_COSTS[rank as UnitRank];
+    // Mapear rank a key de config
+    const rankKey = rank.toLowerCase().replace('d', '') as keyof typeof config.unitCosts;
+    const baseCost = config.unitCosts[rankKey] || UNIT_COSTS[rank as UnitRank] || 0;
     if (!baseCost) return 0;
 
     // Camino de la Tierra reduce costes
     const landLevel = player.paths[PathType.LAND];
-    if (landLevel >= 1) {
-        // N1: -10% coste, N2: -15% coste, N3: -20% coste
-        const discount = landLevel === 1 ? 0.9 : landLevel === 2 ? 0.85 : 0.8;
+    if (landLevel >= 1 && config.paths.land) {
+        const reduction = config.paths.land[`n${landLevel}` as 'n1' | 'n2' | 'n3']?.costReduction || 0;
+        const discount = 1 - reduction;
         return Math.floor(baseCost * discount);
     }
 
@@ -76,7 +79,10 @@ export function calculateUnitCost(
 /**
  * Calcula las acciones disponibles de un jugador
  */
-export function calculateActions(player: Player): number {
+export function calculateActions(
+    player: Player,
+    config: GameConfig = DEFAULT_CONFIG
+): number {
     let actions = 1; // Base: 1 acción
 
     // Jefe Líder: +1 Acción
@@ -88,13 +94,13 @@ export function calculateActions(player: Player): number {
     // Nota: esto se maneja en el GameState, no aquí
 
     // Camino del Clan N3: +1 Acción/turno
-    if (player.paths[PathType.CLAN] >= 3) {
-        actions += 1;
+    if (player.paths[PathType.CLAN] >= 3 && config.paths.clan?.n3?.actionBonus) {
+        actions += config.paths.clan.n3.actionBonus;
     }
 
     // Camino de la Guerra N2: +1 Acción/turno
-    if (player.paths[PathType.WAR] >= 2) {
-        actions += 1;
+    if (player.paths[PathType.WAR] >= 2 && config.paths.war?.n2?.actionBonus) {
+        actions += config.paths.war.n2.actionBonus;
     }
 
     return actions;
@@ -106,9 +112,10 @@ export function calculateActions(player: Player): number {
 export function canAffordUnit(
     player: Player,
     rank: UnitRank | string,
-    count: number = 1
+    count: number = 1,
+    config: GameConfig = DEFAULT_CONFIG
 ): boolean {
-    const cost = calculateUnitCost(rank, player);
+    const cost = calculateUnitCost(rank, player, config);
     return player.gold >= cost * count;
 }
 
@@ -146,9 +153,12 @@ export function canDeployRank(
  * Obtiene el límite máximo de jefes para un jugador
  * WAR N3 permite tener hasta 2 jefes, sin él solo 1
  */
-export function getChiefLimit(player: Player): number {
-    if (player.paths[PathType.WAR] >= 3) {
-        return 2; // WAR N3: hasta 2 jefes
+export function getChiefLimit(
+    player: Player,
+    config: GameConfig = DEFAULT_CONFIG
+): number {
+    if (player.paths[PathType.WAR] >= 3 && config.paths.war?.n3?.maxChiefs) {
+        return config.paths.war.n3.maxChiefs;
     }
     return 1; // Sin WAR N3: solo 1 jefe
 }

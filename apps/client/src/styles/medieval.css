@@ -1,0 +1,281 @@
+/* Estilos Medievales - Warpath */
+
+/* Variables de color */
+:root {
+    --parchment: #F4E4BC;
+    --parchment-dark: #E8D5A3;
+    --wood: #8B6F47;
+    --wood-dark: #6B5235;
+    --stone: #9CA3AF;
+    --stone-dark: #6B7280;
+    --gold: #D4AF37;
+    --gold-dark: #B8941F;
+    --blood: #8B0000;
+    --blood-dark: #5C0000;
+    --steel: #C0C0C0;
+    --steel-dark: #808080;
+    
+    /* Colores de clan */
+    --clan-red: #C41E3A;
+    --clan-blue: #1E3A8A;
+    --clan-green: #166534;
+    --clan-yellow: #CA8A04;
+    
+    /* Sombras */
+    --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+    --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+    --shadow-strong: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* Fuentes */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
+
+body {
+    font-family: 'Crimson Text', serif;
+    background: linear-gradient(135deg, #2C1810 0%, #1A0F08 100%);
+    color: var(--parchment);
+}
+
+/* Texturas de fondo */
+.parchment-bg {
+    background: 
+        linear-gradient(135deg, var(--parchment) 0%, var(--parchment-dark) 100%),
+        url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    background-blend-mode: overlay;
+    border: 2px solid var(--wood-dark);
+    box-shadow: var(--shadow-medium);
+}
+
+.wood-bg {
+    background: 
+        linear-gradient(135deg, var(--wood) 0%, var(--wood-dark) 100%),
+        repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 0, 0, 0.1) 2px,
+            rgba(0, 0, 0, 0.1) 4px
+        );
+    border: 3px solid var(--wood-dark);
+    box-shadow: var(--shadow-soft);
+}
+
+.stone-bg {
+    background: 
+        linear-gradient(135deg, var(--stone) 0%, var(--stone-dark) 100%),
+        url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23000000' fill-opacity='0.05'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h2v22H20v-1.5zM0 20h2v20H0V20zm4 0h2v20H4V20zm4 0h2v20H8V20zm4 0h2v20h-2V20zm4 0h2v20h-2V20zm4 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2z'/%3E%3C/g%3E%3C/svg%3E");
+    background-blend-mode: overlay;
+    border: 2px solid var(--stone-dark);
+    box-shadow: var(--shadow-soft);
+}
+
+/* Paneles flotantes */
+.floating-panel {
+    background: rgba(244, 228, 188, 0.95);
+    backdrop-filter: blur(10px);
+    border: 2px solid var(--wood-dark);
+    border-radius: 8px;
+    box-shadow: var(--shadow-strong);
+    color: #1A0F08;
+}
+
+.floating-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        linear-gradient(135deg, transparent 0%, rgba(212, 175, 55, 0.1) 100%),
+        url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23D4AF37' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
+    opacity: 0.3;
+    pointer-events: none;
+    border-radius: 8px;
+}
+
+/* Botones estilo tablero táctico */
+.tactical-button {
+    font-family: 'Cinzel', serif;
+    background: linear-gradient(135deg, var(--wood) 0%, var(--wood-dark) 100%);
+    border: 4px solid var(--wood-dark);
+    color: var(--parchment);
+    padding: 20px 40px;
+    font-size: 20px;
+    font-weight: 700;
+    border-radius: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 
+        0 8px 16px rgba(0, 0, 0, 0.4),
+        inset 0 2px 4px rgba(255, 255, 255, 0.1),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+    min-height: 64px;
+    min-width: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.tactical-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.tactical-button:hover::before {
+    left: 100%;
+}
+
+.tactical-button:hover:not(:disabled) {
+    transform: translateY(-4px) scale(1.08);
+    box-shadow: 
+        0 12px 24px rgba(0, 0, 0, 0.5),
+        inset 0 2px 4px rgba(255, 255, 255, 0.15),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+        0 0 20px rgba(212, 175, 55, 0.4);
+    border-color: var(--gold);
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+    color: #1A0F08;
+}
+
+.tactical-button:active:not(:disabled) {
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 
+        0 6px 12px rgba(0, 0, 0, 0.4),
+        inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.tactical-button.active {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+    border-color: var(--gold-dark);
+    color: #1A0F08;
+    box-shadow: 
+        0 8px 16px rgba(0, 0, 0, 0.4),
+        0 0 30px rgba(212, 175, 55, 0.7),
+        inset 0 2px 4px rgba(255, 255, 255, 0.2);
+    transform: scale(1.06);
+}
+
+.tactical-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none !important;
+    filter: grayscale(0.5);
+}
+
+/* Títulos */
+.medieval-title {
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    color: var(--gold);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    letter-spacing: 1px;
+}
+
+.medieval-subtitle {
+    font-family: 'Cinzel', serif;
+    font-weight: 600;
+    color: var(--wood-dark);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Scrollbar estilo pergamino */
+::-webkit-scrollbar {
+    width: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--wood-dark);
+    border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--wood);
+    border-radius: 6px;
+    border: 2px solid var(--wood-dark);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--gold);
+}
+
+/* Aura de selección */
+.territory-aura {
+    filter: drop-shadow(0 0 10px currentColor);
+    animation: pulse-aura 2s ease-in-out infinite;
+}
+
+@keyframes pulse-aura {
+    0%, 100% {
+        filter: drop-shadow(0 0 10px currentColor);
+    }
+    50% {
+        filter: drop-shadow(0 0 20px currentColor);
+    }
+}
+
+/* Efecto de vidrio esmerilado */
+.glass-effect {
+    background: rgba(244, 228, 188, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(139, 111, 71, 0.3);
+}
+
+/* Animaciones suaves */
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.slide-in-right {
+    animation: slideInRight 0.4s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.slide-in-left {
+    animation: slideInLeft 0.4s ease-out;
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+

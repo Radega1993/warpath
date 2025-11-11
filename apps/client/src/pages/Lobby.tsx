@@ -83,39 +83,39 @@ export default function Lobby() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-8">
-            <div className="max-w-4xl mx-auto">
-                <h1 className="text-4xl font-bold text-center mb-8 text-yellow-400">
-                    Lobby
+        <div className="min-h-screen bg-[#0a0a0f] p-8 relative overflow-hidden">
+            <div className="max-w-4xl mx-auto relative z-10">
+                <h1 className="font-['Orbitron'] text-5xl text-center mb-8 text-[#00d4ff] font-bold">
+                    🏰 LOBBY
                 </h1>
 
                 <div className="grid md:grid-cols-2 gap-6">
                     {/* Create Room */}
-                    <div className="bg-gray-800 rounded-lg shadow-xl p-6">
-                        <h2 className="text-2xl font-bold mb-4 text-white">Crear Sala</h2>
+                    <div className="modern-panel p-6 slide-in">
+                        <h2 className="modern-panel-header text-2xl mb-4">Crear Sala</h2>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                <label className="block text-sm font-medium font-['Orbitron'] mb-2 text-[#00d4ff] uppercase tracking-wider">
                                     Modo
                                 </label>
                                 <select
                                     value={mode}
                                     onChange={(e) => setMode(e.target.value)}
-                                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                                    className="modern-input w-full"
                                 >
                                     <option value="standard">Estándar</option>
                                 </select>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                <label className="block text-sm font-medium font-['Orbitron'] mb-2 text-[#00d4ff] uppercase tracking-wider">
                                     Máximo de jugadores
                                 </label>
                                 <select
                                     value={maxPlayers}
                                     onChange={(e) => setMaxPlayers(Number(e.target.value))}
-                                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                                    className="modern-input w-full"
                                 >
                                     <option value={2}>2</option>
                                     <option value={3}>3</option>
@@ -125,20 +125,21 @@ export default function Lobby() {
 
                             <button
                                 onClick={handleCreateRoom}
-                                className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-4 rounded-lg transition-colors"
+                                className="w-full modern-button"
                             >
-                                Crear Sala
+                                <span className="text-3xl">🏰</span>
+                                <span>Crear Sala</span>
                             </button>
                         </div>
                     </div>
 
                     {/* Join Room */}
-                    <div className="bg-gray-800 rounded-lg shadow-xl p-6">
-                        <h2 className="text-2xl font-bold mb-4 text-white">Unirse a Sala</h2>
+                    <div className="modern-panel p-6 slide-in">
+                        <h2 className="modern-panel-header text-2xl mb-4">Unirse a Sala</h2>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                <label className="block text-sm font-medium font-['Orbitron'] mb-2 text-[#00d4ff] uppercase tracking-wider">
                                     ID de Sala
                                 </label>
                                 <input
@@ -146,16 +147,17 @@ export default function Lobby() {
                                     value={roomId}
                                     onChange={(e) => setRoomId(e.target.value)}
                                     onKeyPress={(e) => e.key === 'Enter' && handleJoinRoom()}
-                                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                    className="modern-input w-full"
                                     placeholder="Ingresa el ID de la sala"
                                 />
                             </div>
 
                             <button
                                 onClick={handleJoinRoom}
-                                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+                                className="w-full modern-button secondary"
                             >
-                                Unirse
+                                <span className="text-3xl">🚪</span>
+                                <span>Unirse</span>
                             </button>
                         </div>
                     </div>

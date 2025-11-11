@@ -22,3 +22,6 @@ export {
     getChiefLimit
 } from './economy';
 
+// Config
+export { GameConfig, DEFAULT_CONFIG } from './config';
+

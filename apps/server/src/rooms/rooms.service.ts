@@ -1,67 +1,46 @@
 import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { RaceType, HeroType } from '@warpath/rules-engine';
+import { Room, RoomDocument, RoomStatus, RoomPlayer } from '../schemas/room.schema';
 
-export enum RoomStatus {
-    WAITING = 'waiting',
-    PICKING = 'picking',
-    READY = 'ready',
-    IN_PROGRESS = 'in_progress',
-}
-
-export interface RoomPlayer {
-    userId: string;
-    handle: string;
-    seat: number;
-    raceId?: RaceType;
-    heroId?: HeroType;
-    ready: boolean;
-}
-
-export interface Room {
-    id: string;
-    mode: string;
-    maxPlayers: number;
-    status: RoomStatus;
-    players: RoomPlayer[];
-    creatorId: string; // userId del creador de la sala
-    createdAt: Date;
-    startedAt?: Date;
-}
+// Re-exportar tipos para compatibilidad
+export { RoomStatus, RoomPlayer, Room };
 
 @Injectable()
 export class RoomsService {
-    private rooms: Map<string, Room> = new Map();
+    constructor(
+        @InjectModel(Room.name) private roomModel: Model<RoomDocument>,
+    ) { }
 
     /**
      * Crea una nueva sala
      */
-    createRoom(mode: string, maxPlayers: number, creatorId: string): Room {
-        const room: Room = {
+    async createRoom(mode: string, maxPlayers: number, creatorId: string): Promise<Room> {
+        const room = new this.roomModel({
             id: uuidv4(),
             mode,
             maxPlayers,
             status: RoomStatus.WAITING,
             players: [],
             creatorId,
-            createdAt: new Date(),
-        };
-        this.rooms.set(room.id, room);
-        return room;
+        });
+        return await room.save();
     }
 
     /**
      * Obtiene una sala por ID
      */
-    getRoom(roomId: string): Room | undefined {
-        return this.rooms.get(roomId);
+    async getRoom(roomId: string): Promise<Room | null> {
+        return await this.roomModel.findOne({ id: roomId }).exec();
     }
 
     /**
      * Añade un jugador a una sala
      */
-    addPlayer(roomId: string, userId: string, handle: string): RoomPlayer | null {
-        const room = this.rooms.get(roomId);
+    async addPlayer(roomId: string, userId: string, handle: string): Promise<RoomPlayer | null> {
+        const room = await this.roomModel.findOne({ id: roomId }).exec();
         if (!room) {
             return null;
         }
@@ -90,14 +69,15 @@ export class RoomsService {
             room.status = RoomStatus.PICKING;
         }
 
+        await room.save();
         return player;
     }
 
     /**
      * Elimina un jugador de una sala
      */
-    removePlayer(roomId: string, userId: string): boolean {
-        const room = this.rooms.get(roomId);
+    async removePlayer(roomId: string, userId: string): Promise<boolean> {
+        const room = await this.roomModel.findOne({ id: roomId }).exec();
         if (!room) {
             return false;
         }
@@ -114,14 +94,15 @@ export class RoomsService {
             room.status = RoomStatus.WAITING;
         }
 
+        await room.save();
         return true;
     }
 
     /**
      * Selecciona raza para un jugador
      */
-    pickFaction(roomId: string, userId: string, raceId: RaceType): boolean {
-        const room = this.rooms.get(roomId);
+    async pickFaction(roomId: string, userId: string, raceId: RaceType): Promise<boolean> {
+        const room = await this.roomModel.findOne({ id: roomId }).exec();
         if (!room) {
             return false;
         }
@@ -138,14 +119,15 @@ export class RoomsService {
         }
 
         player.raceId = raceId;
+        await room.save();
         return true;
     }
 
     /**
      * Selecciona jefe para un jugador
      */
-    pickHero(roomId: string, userId: string, heroId: HeroType): boolean {
-        const room = this.rooms.get(roomId);
+    async pickHero(roomId: string, userId: string, heroId: HeroType): Promise<boolean> {
+        const room = await this.roomModel.findOne({ id: roomId }).exec();
         if (!room) {
             return false;
         }
@@ -162,14 +144,15 @@ export class RoomsService {
         }
 
         player.heroId = heroId;
+        await room.save();
         return true;
     }
 
     /**
      * Marca un jugador como listo
      */
-    setPlayerReady(roomId: string, userId: string, ready: boolean): boolean {
-        const room = this.rooms.get(roomId);
+    async setPlayerReady(roomId: string, userId: string, ready: boolean): Promise<boolean> {
+        const room = await this.roomModel.findOne({ id: roomId }).exec();
         if (!room) {
             return false;
         }
@@ -187,14 +170,15 @@ export class RoomsService {
             room.status = RoomStatus.READY;
         }
 
+        await room.save();
         return true;
     }
 
     /**
      * Inicia una partida
      */
-    startMatch(roomId: string): boolean {
-        const room = this.rooms.get(roomId);
+    async startMatch(roomId: string): Promise<boolean> {
+        const room = await this.roomModel.findOne({ id: roomId }).exec();
         if (!room) {
             return false;
         }
@@ -217,14 +201,16 @@ export class RoomsService {
 
         room.status = RoomStatus.IN_PROGRESS;
         room.startedAt = new Date();
+        await room.save();
         return true;
     }
 
     /**
      * Elimina una sala
      */
-    deleteRoom(roomId: string): boolean {
-        return this.rooms.delete(roomId);
+    async deleteRoom(roomId: string): Promise<boolean> {
+        const result = await this.roomModel.deleteOne({ id: roomId }).exec();
+        return result.deletedCount > 0;
     }
 }
 

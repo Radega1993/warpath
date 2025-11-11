@@ -101,7 +101,13 @@ Lanzar en producción un MVP jugable online (web-first) con partidas de 2–4 ju
 **Objetivo:** Robustez de red y UX.
 
 **Tareas principales:**
-- Reconexión robusta, rate-limiting de acciones, validaciones extra
+- ✅ **Base de datos MongoDB:** Migración completada
+  - ✅ Docker Compose con MongoDB (puerto 27018)
+  - ✅ Esquemas Mongoose (Room, Match, MatchSnapshot, User)
+  - ✅ Servicios migrados (RoomsService, MatchService)
+  - ✅ Gateways actualizados (métodos async)
+  - ✅ Tests actualizados para mocks de MongoDB
+- Reconexión robusta (mejorar la actual), rate-limiting de acciones, validaciones extra
 - Sentry (front/back), tracing básico (OpenTelemetry)
 - Modo Bots para rellenar huecos en salas
 - Persistir repeticiones (lista de acciones + seed) para debug

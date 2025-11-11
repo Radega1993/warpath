@@ -94,21 +94,21 @@ export default function Room() {
     });
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-8">
-            <div className="max-w-6xl mx-auto">
-                <h1 className="text-4xl font-bold text-center mb-8 text-yellow-400">
-                    Sala: {roomId || currentRoom?.id || 'Cargando...'}
+        <div className="min-h-screen bg-[#0a0a0f] p-8 relative overflow-hidden">
+            <div className="max-w-6xl mx-auto relative z-10">
+                <h1 className="font-['Orbitron'] text-4xl text-center mb-8 text-[#00d4ff] font-bold">
+                    🏰 SALA: {roomId || currentRoom?.id || 'Cargando...'}
                 </h1>
 
                 <div className="grid md:grid-cols-2 gap-6">
                     {/* Player Selection */}
-                    <div className="bg-gray-800 rounded-lg shadow-xl p-6">
-                        <h2 className="text-2xl font-bold mb-4 text-white">Tu Selección</h2>
+                    <div className="modern-panel p-6 slide-in">
+                        <h2 className="modern-panel-header text-2xl mb-4">Tu Selección</h2>
 
                         <div className="space-y-6">
                             {/* Race Selection */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                <label className="block text-sm font-medium font-['Orbitron'] mb-2 text-[#00d4ff] uppercase tracking-wider">
                                     Raza
                                 </label>
                                 <div className="grid grid-cols-2 gap-2">
@@ -116,9 +116,9 @@ export default function Room() {
                                         <button
                                             key={race.id}
                                             onClick={() => setSelectedRace(race.id)}
-                                            className={`px-4 py-2 rounded-lg transition-colors ${selectedRace === race.id
-                                                ? 'bg-yellow-500 text-gray-900'
-                                                : 'bg-gray-700 text-white hover:bg-gray-600'
+                                            className={`px-4 py-2 rounded-lg transition-colors font-['Rajdhani'] ${selectedRace === race.id
+                                                ? 'modern-button active'
+                                                : 'modern-button secondary'
                                                 }`}
                                         >
                                             {race.name}
@@ -128,9 +128,10 @@ export default function Room() {
                                 <button
                                     onClick={handlePickFaction}
                                     disabled={!selectedRace || currentPlayer?.raceId === selectedRace}
-                                    className="mt-2 w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                                    className="mt-2 w-full modern-button disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Seleccionar Raza
+                                    <span className="text-3xl">⚔️</span>
+                                    <span>Seleccionar Raza</span>
                                 </button>
                             </div>
 
@@ -139,10 +140,7 @@ export default function Room() {
                                 <div className="mt-4">
                                     <button
                                         onClick={() => handleSetReady(!currentPlayer?.ready)}
-                                        className={`w-full font-bold py-2 px-4 rounded-lg transition-colors ${currentPlayer?.ready
-                                            ? 'bg-green-500 hover:bg-green-600 text-white'
-                                            : 'bg-yellow-500 hover:bg-yellow-600 text-gray-900'
-                                            }`}
+                                        className={`w-full modern-button ${currentPlayer?.ready ? 'success' : ''}`}
                                     >
                                         {currentPlayer?.ready ? '✓ Listo' : 'Marcar como Listo'}
                                     </button>
@@ -152,8 +150,8 @@ export default function Room() {
                     </div>
 
                     {/* Players List */}
-                    <div className="bg-gray-800 rounded-lg shadow-xl p-6">
-                        <h2 className="text-2xl font-bold mb-4 text-white">
+                    <div className="modern-panel p-6 slide-in">
+                        <h2 className="modern-panel-header text-2xl mb-4">
                             Jugadores ({currentRoom?.players.length || 0}/{currentRoom?.maxPlayers || 0})
                         </h2>
 
@@ -161,17 +159,19 @@ export default function Room() {
                             {currentRoom?.players.map((player) => (
                                 <div
                                     key={player.userId}
-                                    className={`p-4 rounded-lg ${player.userId === userId ? 'bg-yellow-500/20 border-2 border-yellow-500' : 'bg-gray-700'
+                                    className={`p-4 rounded-lg border-2 ${player.userId === userId
+                                        ? 'bg-[#ffd700]/20 border-[#ffd700]'
+                                        : 'bg-[#050508] border-[#2a2a3e]'
                                         }`}
                                 >
                                     <div className="flex items-center justify-between">
-                                        <span className="font-bold text-white">{player.handle}</span>
+                                        <span className="font-bold font-['Orbitron'] text-[#00d4ff]">{player.handle}</span>
                                         {player.ready && (
-                                            <span className="text-green-400 text-sm">✓ Listo</span>
+                                            <span className="text-[#00ff88] text-sm">✓ Listo</span>
                                         )}
                                     </div>
                                     {player.raceId && (
-                                        <div className="text-sm text-gray-300 mt-1">
+                                        <div className="text-sm text-[#b0b0b0] mt-1 font-['Rajdhani']">
                                             Raza: {RACES.find((r) => r.id === player.raceId)?.name || player.raceId}
                                         </div>
                                     )}
@@ -185,19 +185,20 @@ export default function Room() {
                                 <button
                                     onClick={handleStartMatch}
                                     disabled={!canStart}
-                                    className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition-colors"
+                                    className="w-full modern-button success disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {canStart ? 'Iniciar Partida' : 'Esperando...'}
+                                    <span className="text-3xl">{canStart ? '⚔️' : '⏳'}</span>
+                                    <span>{canStart ? 'Iniciar Partida' : 'Esperando...'}</span>
                                 </button>
                             ) : (
-                                <div className="w-full bg-gray-700 text-gray-400 text-center py-3 px-4 rounded-lg">
+                                <div className="w-full bg-[#050508] text-[#b0b0b0] text-center py-3 px-4 rounded-lg border-2 border-[#2a2a3e] font-['Rajdhani']">
                                     Solo el creador de la sala puede iniciar la partida
                                 </div>
                             )}
 
                             {/* Información de estado */}
                             {isCreator && !canStart && (
-                                <div className="mt-2 text-sm text-gray-400 space-y-1">
+                                <div className="mt-2 text-sm text-[#b0b0b0] space-y-1 font-['Rajdhani']">
                                     {!allReady && (
                                         <div>⏳ Esperando que todos los jugadores seleccionen su raza</div>
                                     )}

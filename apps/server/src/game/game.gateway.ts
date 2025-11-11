@@ -7,15 +7,30 @@ import {
     OnGatewayConnection,
     OnGatewayDisconnect,
 } from '@nestjs/websockets';
+import { UseGuards } from '@nestjs/common';
 import { Server } from 'socket.io';
 import { GameService } from './game.service';
 import { TimerService } from './timer.service';
 import { RoomsService } from '../rooms/rooms.service';
 import { MatchService } from '../match/match.service';
 import { TelemetryService } from '../telemetry/telemetry.service';
-import { AuthenticatedSocket, PlaceDto, AttackDto, FortifyDto, UpgradePathDto } from '../common/types';
-import { PathType } from '@warpath/rules-engine';
+import { AuthService } from '../auth/auth.service';
+import { UsersService } from '../users/users.service';
+import { RateLimitGuard } from '../common/rate-limit.guard';
+import { captureWebSocketError } from '../common/sentry.helper';
+import * as Sentry from '@sentry/node';
+import { AuthenticatedSocket, PlaceDto, AttackDto, FortifyDto, UpgradePathDto, MoveDto, ReinforceDto, UseZoneDto, ConsolidateDto } from '../common/types';
+import { PathType, GamePhase } from '@warpath/rules-engine';
 import { z } from 'zod';
+
+/**
+ * Normaliza un valor de enum a minúsculas y valida que sea un valor válido
+ */
+function normalizeEnum<T extends string>(value: string, enumObject: Record<string, T>): T | null {
+    const normalized = value.toLowerCase();
+    const validValues = Object.values(enumObject);
+    return validValues.includes(normalized as T) ? (normalized as T) : null;
+}
 
 const placeSchema = z.object({
     territoryId: z.string(),
@@ -56,7 +71,34 @@ const fortifySchema = z.object({
 });
 
 const upgradePathSchema = z.object({
-    pathId: z.string(),
+    pathId: z.string().transform((val) => val.toLowerCase()),
+});
+
+const moveSchema = z.object({
+    movements: z.array(z.object({
+        fromId: z.string(),
+        toId: z.string(),
+        units: z.object({
+            d4: z.number().optional(),
+            d6: z.number().optional(),
+            d8: z.number().optional(),
+            d12: z.number().optional(),
+            d20: z.number().optional(),
+            d100: z.number().optional(),
+        }),
+    })),
+});
+
+const reinforceSchema = z.object({
+    territoryId: z.string(),
+});
+
+const useZoneSchema = z.object({
+    territoryId: z.string(),
+});
+
+const consolidateSchema = z.object({
+    territoryId: z.string(),
 });
 
 @WebSocketGateway({
@@ -76,13 +118,32 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         private roomsService: RoomsService,
         private matchService: MatchService,
         private telemetryService: TelemetryService,
+        private authService: AuthService,
+        private usersService: UsersService,
     ) { }
 
     handleConnection(client: AuthenticatedSocket) {
         const roomId = this.extractRoomId(client.nsp.name);
         if (roomId) {
             client.roomId = roomId;
-            console.log(`Client connected to room: ${roomId}`);
+
+            // Intentar obtener userId de los query parameters
+            const queryUserId = (client.handshake.query?.userId as string) || null;
+
+            // Asignar userId automáticamente si no existe
+            if (!client.userId) {
+                if (queryUserId) {
+                    // Usar el userId enviado por el cliente
+                    client.userId = queryUserId;
+                    console.log(`[GameGateway] Client connected to room: ${roomId} (userId from query: ${client.userId})`);
+                } else {
+                    // Generar nuevo userId si no se proporcionó
+                    client.userId = this.authService.generateUserId();
+                    console.log(`[GameGateway] Client connected to room: ${roomId} (userId generated: ${client.userId})`);
+                }
+            } else {
+                console.log(`[GameGateway] Client connected to room: ${roomId} (userId: ${client.userId})`);
+            }
 
             // Enviar estado actual del juego si existe
             const fsm = this.gameService.getGame(roomId);
@@ -98,9 +159,30 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     handleDisconnect(client: AuthenticatedSocket) {
         // Manejar desconexión
         console.log(`Client disconnected from room: ${client.roomId}`);
+
+        // Capturar desconexión inesperada en Sentry (solo si hay un juego activo)
+        if (client.roomId) {
+            const fsm = this.gameService.getGame(client.roomId);
+            if (fsm) {
+                // Solo registrar si el juego está en progreso (no es una desconexión normal al finalizar)
+                const state = fsm.getState();
+                if (state.phase !== GamePhase.LOBBY && state.phase !== GamePhase.GAME_OVER) {
+                    Sentry.captureMessage('Client disconnected during active game', {
+                        level: 'warning',
+                        tags: {
+                            roomId: client.roomId,
+                            userId: client.userId,
+                            phase: state.phase,
+                            turn: state.turn,
+                        },
+                    });
+                }
+            }
+        }
     }
 
     @SubscribeMessage('place')
+    @UseGuards(RateLimitGuard)
     handlePlace(
         @ConnectedSocket() client: AuthenticatedSocket,
         @MessageBody() data: PlaceDto,
@@ -124,11 +206,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
             this.broadcastGameState(roomId);
         } catch (error) {
+            captureWebSocketError(error, {
+                action: 'place',
+                roomId: client.roomId || 'unknown',
+                userId: client.userId || 'unknown',
+            });
             client.emit('error', { code: 'ACTION_FAILED', message: error.message });
         }
     }
 
     @SubscribeMessage('attack')
+    @UseGuards(RateLimitGuard)
     handleAttack(
         @ConnectedSocket() client: AuthenticatedSocket,
         @MessageBody() data: AttackDto,
@@ -166,11 +254,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
             this.broadcastGameState(roomId);
         } catch (error) {
+            captureWebSocketError(error, {
+                action: 'attack',
+                roomId: client.roomId || 'unknown',
+                userId: client.userId || 'unknown',
+            });
             client.emit('error', { code: 'ACTION_FAILED', message: error.message });
         }
     }
 
     @SubscribeMessage('fortify')
+    @UseGuards(RateLimitGuard)
     handleFortify(
         @ConnectedSocket() client: AuthenticatedSocket,
         @MessageBody() data: FortifyDto,
@@ -194,11 +288,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
             this.broadcastGameState(roomId);
         } catch (error) {
+            captureWebSocketError(error, {
+                action: 'fortify',
+                roomId: client.roomId || 'unknown',
+                userId: client.userId || 'unknown',
+            });
             client.emit('error', { code: 'ACTION_FAILED', message: error.message });
         }
     }
 
     @SubscribeMessage('upgrade_path')
+    @UseGuards(RateLimitGuard)
     handleUpgradePath(
         @ConnectedSocket() client: AuthenticatedSocket,
         @MessageBody() data: UpgradePathDto,
@@ -211,22 +311,174 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 return;
             }
 
+            // Validar que el pathId sea un valor válido del enum
+            const normalizedPathId = normalizeEnum(validated.pathId, PathType);
+            if (!normalizedPathId) {
+                client.emit('error', { code: 'INVALID_PATH', message: 'Invalid path ID' });
+                return;
+            }
+
             const fsm = this.gameService.getGame(roomId);
             if (!fsm) {
                 client.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
                 return;
             }
 
-            fsm.upgradePath(validated.pathId as PathType);
+            fsm.upgradePath(normalizedPathId);
 
             this.broadcastGameState(roomId);
         } catch (error) {
+            captureWebSocketError(error, {
+                action: 'upgrade_path',
+                roomId: client.roomId || 'unknown',
+                userId: client.userId || 'unknown',
+            });
+            client.emit('error', { code: 'ACTION_FAILED', message: error.message });
+        }
+    }
+
+    @SubscribeMessage('move')
+    @UseGuards(RateLimitGuard)
+    handleMove(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: MoveDto,
+    ) {
+        try {
+            const validated = moveSchema.parse(data);
+            const roomId = client.roomId;
+            if (!roomId || !client.userId) {
+                client.emit('error', { code: 'UNAUTHORIZED', message: 'Not in a room' });
+                return;
+            }
+
+            const fsm = this.gameService.getGame(roomId);
+            if (!fsm) {
+                client.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+                return;
+            }
+
+            // Convertir movements a formato Troops
+            const movements = validated.movements.map(m => ({
+                fromId: m.fromId,
+                toId: m.toId,
+                troops: this.gameService.convertTroops(m.units),
+            }));
+
+            fsm.moveTroops(movements);
+
+            this.broadcastGameState(roomId);
+        } catch (error) {
+            captureWebSocketError(error, {
+                action: 'move',
+                roomId: client.roomId || 'unknown',
+                userId: client.userId || 'unknown',
+            });
+            client.emit('error', { code: 'ACTION_FAILED', message: error.message });
+        }
+    }
+
+    @SubscribeMessage('reinforce')
+    @UseGuards(RateLimitGuard)
+    handleReinforce(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: ReinforceDto,
+    ) {
+        try {
+            const validated = reinforceSchema.parse(data);
+            const roomId = client.roomId;
+            if (!roomId || !client.userId) {
+                client.emit('error', { code: 'UNAUTHORIZED', message: 'Not in a room' });
+                return;
+            }
+
+            const fsm = this.gameService.getGame(roomId);
+            if (!fsm) {
+                client.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+                return;
+            }
+
+            fsm.reinforceTerritory(validated.territoryId);
+
+            this.broadcastGameState(roomId);
+        } catch (error) {
+            captureWebSocketError(error, {
+                action: 'reinforce',
+                roomId: client.roomId || 'unknown',
+                userId: client.userId || 'unknown',
+            });
+            client.emit('error', { code: 'ACTION_FAILED', message: error.message });
+        }
+    }
+
+    @SubscribeMessage('use_zone')
+    @UseGuards(RateLimitGuard)
+    handleUseZone(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: UseZoneDto,
+    ) {
+        try {
+            const validated = useZoneSchema.parse(data);
+            const roomId = client.roomId;
+            if (!roomId || !client.userId) {
+                client.emit('error', { code: 'UNAUTHORIZED', message: 'Not in a room' });
+                return;
+            }
+
+            const fsm = this.gameService.getGame(roomId);
+            if (!fsm) {
+                client.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+                return;
+            }
+
+            fsm.useZone(validated.territoryId);
+
+            this.broadcastGameState(roomId);
+        } catch (error) {
+            captureWebSocketError(error, {
+                action: 'use_zone',
+                roomId: client.roomId || 'unknown',
+                userId: client.userId || 'unknown',
+            });
+            client.emit('error', { code: 'ACTION_FAILED', message: error.message });
+        }
+    }
+
+    @SubscribeMessage('consolidate')
+    @UseGuards(RateLimitGuard)
+    handleConsolidate(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: ConsolidateDto,
+    ) {
+        try {
+            const validated = consolidateSchema.parse(data);
+            const roomId = client.roomId;
+            if (!roomId || !client.userId) {
+                client.emit('error', { code: 'UNAUTHORIZED', message: 'Not in a room' });
+                return;
+            }
+
+            const fsm = this.gameService.getGame(roomId);
+            if (!fsm) {
+                client.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+                return;
+            }
+
+            fsm.consolidateTerritory(validated.territoryId);
+
+            this.broadcastGameState(roomId);
+        } catch (error) {
+            captureWebSocketError(error, {
+                action: 'consolidate',
+                roomId: client.roomId || 'unknown',
+                userId: client.userId || 'unknown',
+            });
             client.emit('error', { code: 'ACTION_FAILED', message: error.message });
         }
     }
 
     @SubscribeMessage('end_turn')
-    handleEndTurn(@ConnectedSocket() client: AuthenticatedSocket) {
+    @UseGuards(RateLimitGuard)
+    async handleEndTurn(@ConnectedSocket() client: AuthenticatedSocket) {
         const roomId = client.roomId;
         if (!roomId || !client.userId) {
             client.emit('error', { code: 'UNAUTHORIZED', message: 'Not in a room' });
@@ -264,19 +516,30 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // Verificar si el juego terminó
         if (newState.phase === 'game_over') {
             this.timerService.stopTimer(roomId);
-            this.gameService.endGame(roomId);
+            await this.gameService.endGame(roomId);
 
-            const match = this.matchService.getMatch(roomId);
+            const match = await this.matchService.getMatch(roomId);
             const duration = match ? Date.now() - match.startedAt.getTime() : 0;
 
             this.telemetryService.logMatchEnd(roomId, newState.winnerId || '', duration, newState.turn);
+
+            // Actualizar estadísticas de usuarios
+            if (match && match.players) {
+                for (const playerData of match.players) {
+                    await this.usersService.updateUserStats(playerData.userId, {
+                        won: playerData.won,
+                        goldEarned: playerData.finalGold,
+                        territoriesConquered: playerData.territories,
+                    });
+                }
+            }
 
             this.server.to(`/room/${roomId}`).emit('game_over', {
                 winnerId: newState.winnerId,
                 stats: {
                     duration,
                     turns: newState.turn,
-                    players: [],
+                    players: match?.players || [],
                 },
             });
             return;
@@ -296,7 +559,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         );
 
         // Guardar snapshot
-        this.matchService.saveSnapshot(roomId, newState.turn, newState);
+        await this.matchService.saveSnapshot(roomId, newState.turn, newState);
 
         this.broadcastGameState(roomId);
     }

@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: warpath-mongodb
+    restart: unless-stopped
+    ports:
+      - "27030:27017"  # Puerto externo 27030 para evitar conflictos
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: warpath
+      MONGO_INITDB_ROOT_PASSWORD: warpath123
+      MONGO_INITDB_DATABASE: warpath
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - warpath-network
+
+volumes:
+  mongodb_data:
+  mongodb_config:
+
+networks:
+  warpath-network:
+    driver: bridge
+

@@ -1,10 +1,24 @@
 import { create } from 'zustand';
 import { GameState, RoomState, CombatResult } from '../types';
 
+interface User {
+    userId: string;
+    email?: string;
+    handle: string;
+    role: string;
+    isGuest: boolean;
+}
+
 interface GameStore {
     // Connection
     userId: string | null;
     setUserId: (userId: string) => void;
+
+    // Auth
+    user: User | null;
+    setUser: (user: User | null) => void;
+    token: string | null;
+    setToken: (token: string | null) => void;
 
     // Room state
     currentRoom: RoomState | null;
@@ -45,6 +59,11 @@ export const useGameStore = create<GameStore>((set) => ({
             };
         }
     },
+
+    user: null,
+    setUser: (user) => set({ user }),
+    token: null,
+    setToken: (token) => set({ token }),
 
     currentRoom: null,
     setCurrentRoom: (room) => set({ currentRoom: room }),

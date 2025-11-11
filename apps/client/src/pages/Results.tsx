@@ -15,8 +15,8 @@ export default function Results() {
 
     if (!gameState) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
-                <p className="text-gray-400">Cargando resultados...</p>
+            <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+                <p className="text-[#00d4ff] font-['Orbitron']">Cargando resultados...</p>
             </div>
         );
     }
@@ -78,25 +78,25 @@ export default function Results() {
     const playerStats = getPlayerStats();
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
+        <div className="min-h-screen bg-[#0a0a0f] p-4">
             <div className="max-w-4xl mx-auto">
-                <h1 className="text-4xl font-bold text-center mb-8 text-yellow-400">
-                    Resultados de la Partida
+                <h1 className="font-['Orbitron'] text-4xl font-bold text-center mb-8 text-[#ffd700]">
+                    🏆 RESULTADOS DE LA PARTIDA
                 </h1>
 
                 {/* Resultado del jugador */}
-                <div className={`mb-8 p-6 rounded-lg ${isWinner ? 'bg-green-900/30 border-2 border-green-500' : 'bg-red-900/30 border-2 border-red-500'}`}>
-                    <h2 className={`text-2xl font-bold text-center ${isWinner ? 'text-green-400' : 'text-red-400'}`}>
+                <div className={`mb-8 p-6 rounded-lg ${isWinner ? 'bg-[#00ff88]/20 border-2 border-[#00ff88]' : 'bg-[#ff4444]/20 border-2 border-[#ff4444]'}`}>
+                    <h2 className={`text-2xl font-bold text-center font-['Orbitron'] ${isWinner ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
                         {isWinner ? '🎉 ¡Victoria!' : '💀 Derrota'}
                     </h2>
-                    <p className="text-center text-gray-300 mt-2">
+                    <p className="text-center text-[#b0b0b0] mt-2 font-['Rajdhani']">
                         Turno final: {gameState.turn}
                     </p>
                 </div>
 
                 {/* Estadísticas de jugadores */}
-                <div className="bg-gray-800 rounded-lg shadow-xl p-6 mb-6">
-                    <h3 className="text-xl font-bold text-white mb-4">Clasificación</h3>
+                <div className="modern-panel p-6 mb-6">
+                    <h3 className="modern-panel-header text-xl mb-4">Clasificación</h3>
                     <div className="space-y-3">
                         {playerStats.map((stat, index) => {
                             const isCurrentPlayer = stat.userId === userId;
@@ -105,26 +105,26 @@ export default function Results() {
                             return (
                                 <div
                                     key={stat.userId}
-                                    className={`p-4 rounded-lg flex items-center justify-between ${isThisWinner ? 'bg-yellow-900/30 border border-yellow-600' :
-                                            isCurrentPlayer ? 'bg-blue-900/30 border border-blue-600' :
-                                                'bg-gray-700'
+                                    className={`p-4 rounded-lg flex items-center justify-between ${isThisWinner ? 'bg-[#ffd700]/20 border border-[#ffd700]' :
+                                        isCurrentPlayer ? 'bg-[#00d4ff]/20 border border-[#00d4ff]' :
+                                            'bg-[#050508] border border-[#2a2a3e]'
                                         }`}
                                 >
                                     <div className="flex items-center gap-4">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${index === 0 ? 'bg-yellow-500 text-gray-900' :
-                                                index === 1 ? 'bg-gray-400 text-gray-900' :
-                                                    index === 2 ? 'bg-orange-600 text-white' :
-                                                        'bg-gray-600 text-white'
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold font-['Orbitron'] ${index === 0 ? 'bg-[#ffd700] text-[#0a0a0f]' :
+                                            index === 1 ? 'bg-[#b0b0b0] text-[#0a0a0f]' :
+                                                index === 2 ? 'bg-[#ffaa00] text-white' :
+                                                    'bg-[#2a2a3e] text-white'
                                             }`}>
                                             {index + 1}
                                         </div>
                                         <div>
-                                            <p className={`font-bold ${isCurrentPlayer ? 'text-blue-400' : 'text-white'}`}>
+                                            <p className={`font-bold font-['Orbitron'] ${isCurrentPlayer ? 'text-[#00d4ff]' : 'text-white'}`}>
                                                 Jugador {stat.playerId}
                                                 {isCurrentPlayer && ' (Tú)'}
                                                 {isThisWinner && ' 👑'}
                                             </p>
-                                            <p className="text-sm text-gray-400">
+                                            <p className="text-sm text-[#b0b0b0] font-['Rajdhani']">
                                                 {stat.territories} territorios • {stat.totalTroops} tropas
                                             </p>
                                         </div>
@@ -139,15 +139,15 @@ export default function Results() {
                 <div className="flex gap-4 justify-center">
                     <button
                         onClick={() => navigate('/lobby')}
-                        className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg transition-colors"
+                        className="modern-button"
                     >
-                        Volver al Lobby
+                        🏰 Volver al Lobby
                     </button>
                     <button
                         onClick={() => navigate('/')}
-                        className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg transition-colors"
+                        className="modern-button secondary"
                     >
-                        Ir al Inicio
+                        🏠 Ir al Inicio
                     </button>
                 </div>
             </div>

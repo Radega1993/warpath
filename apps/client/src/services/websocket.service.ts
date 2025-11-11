@@ -12,27 +12,56 @@ import {
     RoomState,
     CombatResult,
 } from '../types';
+import { getWebSocketURL } from '../config/env';
 
 class WebSocketService {
     private authSocket: Socket | null = null;
     private lobbySocket: Socket | null = null;
     private gameSocket: Socket | null = null;
+    private reconnectAttempts: Map<string, number> = new Map();
+    private maxReconnectAttempts = 10;
+    private reconnectDelay = 1000; // 1 segundo inicial
+    private reconnectTimeouts: Map<string, NodeJS.Timeout> = new Map();
+    private isManualDisconnect: Map<string, boolean> = new Map();
+    private connectionCallbacks: Map<string, Array<() => void>> = new Map();
 
     // Auth namespace
     connectAuth() {
-        if (this.authSocket?.connected) return;
+        if (this.authSocket?.connected) return this.authSocket;
 
-        this.authSocket = io('http://localhost:3001/', {
+        const socketKey = 'auth';
+        this.isManualDisconnect.set(socketKey, false);
+        this.reconnectAttempts.set(socketKey, 0);
+
+        this.authSocket = io(getWebSocketURL(), {
             transports: ['websocket'],
+            reconnection: true,
+            reconnectionDelay: this.reconnectDelay,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: this.maxReconnectAttempts,
         });
 
         this.authSocket.on('connect', () => {
             console.log('✅ Connected to auth namespace');
-            // userId will be set by the server
+            this.reconnectAttempts.set(socketKey, 0);
+            this.clearReconnectTimeout(socketKey);
+            this.notifyConnection(socketKey);
         });
 
-        this.authSocket.on('disconnect', () => {
-            console.log('❌ Disconnected from auth namespace');
+        this.authSocket.on('disconnect', (reason) => {
+            console.log('❌ Disconnected from auth namespace:', reason);
+            if (!this.isManualDisconnect.get(socketKey)) {
+                this.handleReconnect(socketKey, () => this.connectAuth());
+            }
+        });
+
+        this.authSocket.on('reconnect_attempt', (attemptNumber) => {
+            console.log(`🔄 Reconnecting to auth namespace (attempt ${attemptNumber})...`);
+        });
+
+        this.authSocket.on('reconnect_failed', () => {
+            console.error('❌ Failed to reconnect to auth namespace after all attempts');
+            this.notifyConnectionError(socketKey);
         });
 
         return this.authSocket;
@@ -42,23 +71,67 @@ class WebSocketService {
     connectLobby() {
         if (this.lobbySocket?.connected) return this.lobbySocket;
 
+        const socketKey = 'lobby';
+        this.isManualDisconnect.set(socketKey, false);
+        this.reconnectAttempts.set(socketKey, 0);
+
         // Obtener userId del store si está disponible
         const storeUserId = this.getUserIdFromStore();
 
-        this.lobbySocket = io('http://localhost:3001/lobby', {
+        this.lobbySocket = io(getWebSocketURL('lobby'), {
             transports: ['websocket'],
             query: storeUserId ? { userId: storeUserId } : undefined,
+            reconnection: true,
+            reconnectionDelay: this.reconnectDelay,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: this.maxReconnectAttempts,
         });
 
         this.lobbySocket.on('connect', () => {
             console.log('✅ Connected to lobby namespace');
+            this.reconnectAttempts.set(socketKey, 0);
+            this.clearReconnectTimeout(socketKey);
+            this.notifyConnection(socketKey);
         });
 
-        this.lobbySocket.on('disconnect', () => {
-            console.log('❌ Disconnected from lobby namespace');
+        this.lobbySocket.on('disconnect', (reason) => {
+            console.log('❌ Disconnected from lobby namespace:', reason);
+            if (!this.isManualDisconnect.get(socketKey)) {
+                this.handleReconnect(socketKey, () => {
+                    // Reconectar con el mismo userId
+                    const currentUserId = this.getUserIdFromStore();
+                    this.lobbySocket = io(getWebSocketURL('lobby'), {
+                        transports: ['websocket'],
+                        query: currentUserId ? { userId: currentUserId } : undefined,
+                        reconnection: true,
+                        reconnectionDelay: this.reconnectDelay,
+                        reconnectionDelayMax: 5000,
+                        reconnectionAttempts: this.maxReconnectAttempts,
+                    });
+                    this.setupLobbyListeners();
+                });
+            }
         });
+
+        this.lobbySocket.on('reconnect_attempt', (attemptNumber) => {
+            console.log(`🔄 Reconnecting to lobby namespace (attempt ${attemptNumber})...`);
+        });
+
+        this.lobbySocket.on('reconnect_failed', () => {
+            console.error('❌ Failed to reconnect to lobby namespace after all attempts');
+            this.notifyConnectionError(socketKey);
+        });
+
+        this.setupLobbyListeners();
 
         return this.lobbySocket;
+    }
+
+    private setupLobbyListeners() {
+        if (!this.lobbySocket) return;
+
+        // Re-registrar listeners de eventos del lobby si es necesario
+        // Los listeners ya están registrados en los componentes que usan onRoomUpdate, etc.
     }
 
     private getUserIdFromStore(): string | null {
@@ -78,23 +151,80 @@ class WebSocketService {
 
     // Game namespace
     connectGame(roomId: string) {
-        if (this.gameSocket?.connected) {
+        const socketKey = `game-${roomId}`;
+
+        // Si ya está conectado al mismo room, no hacer nada
+        if (this.gameSocket?.connected && this.gameSocket.nsp.name === `/room/${roomId}`) {
+            return this.gameSocket;
+        }
+
+        // Desconectar socket anterior si existe
+        if (this.gameSocket) {
+            this.isManualDisconnect.set(socketKey, true);
             this.gameSocket.disconnect();
         }
 
-        this.gameSocket = io(`http://localhost:3001/room/${roomId}`, {
+        this.isManualDisconnect.set(socketKey, false);
+        this.reconnectAttempts.set(socketKey, 0);
+
+        // Obtener userId del store si está disponible
+        const storeUserId = this.getUserIdFromStore();
+
+        this.gameSocket = io(getWebSocketURL(`room/${roomId}`), {
             transports: ['websocket'],
+            query: storeUserId ? { userId: storeUserId } : undefined,
+            reconnection: true,
+            reconnectionDelay: this.reconnectDelay,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: this.maxReconnectAttempts,
         });
 
         this.gameSocket.on('connect', () => {
             console.log(`✅ Connected to game namespace: /room/${roomId}`);
+            this.reconnectAttempts.set(socketKey, 0);
+            this.clearReconnectTimeout(socketKey);
+            this.notifyConnection(socketKey);
+            // El servidor enviará automáticamente el game_state al conectar
         });
 
-        this.gameSocket.on('disconnect', () => {
-            console.log('❌ Disconnected from game namespace');
+        this.gameSocket.on('disconnect', (reason) => {
+            console.log('❌ Disconnected from game namespace:', reason);
+            if (!this.isManualDisconnect.get(socketKey)) {
+                this.handleReconnect(socketKey, () => {
+                    // Reconectar con el mismo userId y roomId
+                    const currentUserId = this.getUserIdFromStore();
+                    this.gameSocket = io(getWebSocketURL(`room/${roomId}`), {
+                        transports: ['websocket'],
+                        query: currentUserId ? { userId: currentUserId } : undefined,
+                        reconnection: true,
+                        reconnectionDelay: this.reconnectDelay,
+                        reconnectionDelayMax: 5000,
+                        reconnectionAttempts: this.maxReconnectAttempts,
+                    });
+                    this.setupGameListeners(roomId);
+                });
+            }
         });
+
+        this.gameSocket.on('reconnect_attempt', (attemptNumber) => {
+            console.log(`🔄 Reconnecting to game namespace (attempt ${attemptNumber})...`);
+        });
+
+        this.gameSocket.on('reconnect_failed', () => {
+            console.error('❌ Failed to reconnect to game namespace after all attempts');
+            this.notifyConnectionError(socketKey);
+        });
+
+        this.setupGameListeners(roomId);
 
         return this.gameSocket;
+    }
+
+    private setupGameListeners(roomId: string) {
+        if (!this.gameSocket) return;
+
+        // Re-registrar listeners de eventos del juego si es necesario
+        // Los listeners ya están registrados en los componentes que usan onGameState, etc.
     }
 
     // Lobby events
@@ -202,6 +332,26 @@ class WebSocketService {
         this.gameSocket.emit('upgrade_path', data);
     }
 
+    move(data: { movements: Array<{ fromId: string; toId: string; units: Record<string, number> }> }) {
+        if (!this.gameSocket) return;
+        this.gameSocket.emit('move', data);
+    }
+
+    reinforce(territoryId: string) {
+        if (!this.gameSocket) return;
+        this.gameSocket.emit('reinforce', { territoryId });
+    }
+
+    useZone(territoryId: string) {
+        if (!this.gameSocket) return;
+        this.gameSocket.emit('use_zone', { territoryId });
+    }
+
+    consolidate(territoryId: string) {
+        if (!this.gameSocket) return;
+        this.gameSocket.emit('consolidate', { territoryId });
+    }
+
     endTurn() {
         if (!this.gameSocket) return;
         this.gameSocket.emit('end_turn');
@@ -247,8 +397,73 @@ class WebSocketService {
         }
     }
 
+    // Reconexión helpers
+    private handleReconnect(socketKey: string, reconnectFn: () => void) {
+        const attempts = this.reconnectAttempts.get(socketKey) || 0;
+
+        if (attempts >= this.maxReconnectAttempts) {
+            console.error(`❌ Max reconnection attempts reached for ${socketKey}`);
+            this.notifyConnectionError(socketKey);
+            return;
+        }
+
+        this.reconnectAttempts.set(socketKey, attempts + 1);
+        const delay = Math.min(this.reconnectDelay * Math.pow(2, attempts), 5000);
+
+        console.log(`🔄 Attempting to reconnect ${socketKey} in ${delay}ms (attempt ${attempts + 1}/${this.maxReconnectAttempts})`);
+
+        const timeout = setTimeout(() => {
+            this.reconnectTimeouts.delete(socketKey);
+            reconnectFn();
+        }, delay);
+
+        this.reconnectTimeouts.set(socketKey, timeout);
+    }
+
+    private clearReconnectTimeout(socketKey: string) {
+        const timeout = this.reconnectTimeouts.get(socketKey);
+        if (timeout) {
+            clearTimeout(timeout);
+            this.reconnectTimeouts.delete(socketKey);
+        }
+    }
+
+    private notifyConnection(socketKey: string) {
+        const callbacks = this.connectionCallbacks.get(socketKey) || [];
+        callbacks.forEach(cb => cb());
+    }
+
+    private notifyConnectionError(socketKey: string) {
+        // Emitir evento personalizado para que los componentes puedan escuchar
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('warpath:connection_error', {
+                detail: { socketKey }
+            }));
+        }
+    }
+
+    // Registrar callbacks de conexión
+    onConnection(socketKey: string, callback: () => void) {
+        if (!this.connectionCallbacks.has(socketKey)) {
+            this.connectionCallbacks.set(socketKey, []);
+        }
+        this.connectionCallbacks.get(socketKey)!.push(callback);
+    }
+
     // Cleanup
     disconnect() {
+        // Marcar como desconexión manual
+        this.isManualDisconnect.set('auth', true);
+        this.isManualDisconnect.set('lobby', true);
+        if (this.gameSocket) {
+            const roomId = this.gameSocket.nsp.name.replace('/room/', '');
+            this.isManualDisconnect.set(`game-${roomId}`, true);
+        }
+
+        // Limpiar timeouts de reconexión
+        this.reconnectTimeouts.forEach(timeout => clearTimeout(timeout));
+        this.reconnectTimeouts.clear();
+
         if (this.authSocket) {
             this.authSocket.disconnect();
             this.authSocket = null;
@@ -261,6 +476,19 @@ class WebSocketService {
             this.gameSocket.disconnect();
             this.gameSocket = null;
         }
+    }
+
+    // Verificar estado de conexión
+    isConnected(socketKey?: string): boolean {
+        if (socketKey === 'auth') return this.authSocket?.connected || false;
+        if (socketKey === 'lobby') return this.lobbySocket?.connected || false;
+        if (socketKey?.startsWith('game-')) {
+            const roomId = socketKey.replace('game-', '');
+            return this.gameSocket?.connected && this.gameSocket.nsp.name === `/room/${roomId}` || false;
+        }
+        return (this.authSocket?.connected || false) &&
+            (this.lobbySocket?.connected || false) &&
+            (this.gameSocket?.connected || false);
     }
 }
 

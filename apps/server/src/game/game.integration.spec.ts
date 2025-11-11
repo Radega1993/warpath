@@ -1,18 +1,60 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getModelToken } from '@nestjs/mongoose';
 import { GameService } from './game.service';
 import { MatchService } from '../match/match.service';
 import { RoomsService } from '../rooms/rooms.service';
 import { GameFSM } from '@warpath/rules-engine';
 import { UnitRank, PathType } from '@warpath/rules-engine';
+import { Room } from '../schemas/room.schema';
+import { Match, MatchSnapshot } from '../schemas/match.schema';
 
 describe('GameService Integration', () => {
     let gameService: GameService;
     let roomsService: RoomsService;
     let matchService: MatchService;
+    let mockRoomModel: any;
+    let mockMatchModel: any;
+    let mockSnapshotModel: any;
 
     beforeEach(async () => {
+        // Mock de Room Model
+        mockRoomModel = {
+            findOne: jest.fn(),
+            create: jest.fn(),
+            save: jest.fn(),
+        };
+
+        // Mock de Match Model
+        mockMatchModel = {
+            findOne: jest.fn(),
+            create: jest.fn(),
+            updateOne: jest.fn(),
+        };
+
+        // Mock de MatchSnapshot Model
+        mockSnapshotModel = {
+            find: jest.fn(),
+            create: jest.fn(),
+        };
+
         const module: TestingModule = await Test.createTestingModule({
-            providers: [GameService, MatchService, RoomsService],
+            providers: [
+                GameService,
+                RoomsService,
+                MatchService,
+                {
+                    provide: getModelToken(Room.name),
+                    useValue: mockRoomModel,
+                },
+                {
+                    provide: getModelToken(Match.name),
+                    useValue: mockMatchModel,
+                },
+                {
+                    provide: getModelToken(MatchSnapshot.name),
+                    useValue: mockSnapshotModel,
+                },
+            ],
         }).compile();
 
         gameService = module.get<GameService>(GameService);
@@ -21,35 +63,60 @@ describe('GameService Integration', () => {
     });
 
     describe('Full Game Flow', () => {
-        it('should complete a full game flow: create room -> start game -> play turn -> end turn', () => {
+        it('should complete a full game flow: create room -> start game -> play turn -> end turn', async () => {
             // 1. Crear sala
-            const room = roomsService.createRoom('standard', 2, 'creator1');
+            const mockRoom = {
+                id: 'test-room-id',
+                mode: 'standard',
+                maxPlayers: 2,
+                status: 'waiting',
+                players: [],
+                creatorId: 'creator1',
+                save: jest.fn().mockResolvedValue(true),
+            };
+
+            mockRoomModel.create = jest.fn().mockReturnValue(mockRoom);
+            const room = await roomsService.createRoom('standard', 2, 'creator1');
             expect(room).toBeDefined();
 
             // 2. Añadir jugadores
-            const player1 = roomsService.addPlayer(room.id, 'user1', 'Player1');
-            const player2 = roomsService.addPlayer(room.id, 'user2', 'Player2');
+            mockRoomModel.findOne = jest.fn().mockReturnValue({
+                exec: jest.fn().mockResolvedValue(mockRoom),
+            });
+
+            const player1 = await roomsService.addPlayer(room.id, 'user1', 'Player1');
+            const player2 = await roomsService.addPlayer(room.id, 'user2', 'Player2');
             expect(player1).toBeDefined();
             expect(player2).toBeDefined();
 
             // 3. Seleccionar raza y jefe
-            roomsService.pickFaction(room.id, 'user1', 'human' as any);
-            roomsService.pickFaction(room.id, 'user2', 'orc' as any);
-            roomsService.pickHero(room.id, 'user1', 'merchant' as any);
-            roomsService.pickHero(room.id, 'user2', 'battler' as any);
+            await roomsService.pickFaction(room.id, 'user1', 'human' as any);
+            await roomsService.pickFaction(room.id, 'user2', 'orc' as any);
+            await roomsService.pickHero(room.id, 'user1', 'merchant' as any);
+            await roomsService.pickHero(room.id, 'user2', 'battler' as any);
 
             // 4. Marcar como listos
-            roomsService.setPlayerReady(room.id, 'user1', true);
-            roomsService.setPlayerReady(room.id, 'user2', true);
+            await roomsService.setPlayerReady(room.id, 'user1', true);
+            await roomsService.setPlayerReady(room.id, 'user2', true);
 
             // 5. Iniciar partida (esto cambia el status a 'in_progress')
-            roomsService.startMatch(room.id);
+            mockRoom.status = 'in_progress';
+            mockRoom.startedAt = new Date();
+            await roomsService.startMatch(room.id);
 
             // Verificar que el room está en estado 'in_progress'
-            const roomAfterStart = roomsService.getRoom(room.id);
+            const roomAfterStart = await roomsService.getRoom(room.id);
             expect(roomAfterStart?.status).toBe('in_progress');
 
-            const fsm = gameService.startGame(room.id);
+            // Mock para startGame
+            mockMatchModel.create = jest.fn().mockReturnValue({
+                save: jest.fn().mockResolvedValue({}),
+            });
+            mockSnapshotModel.create = jest.fn().mockReturnValue({
+                save: jest.fn().mockResolvedValue({}),
+            });
+
+            const fsm = await gameService.startGame(room.id);
             expect(fsm).toBeDefined();
             expect(fsm).toBeInstanceOf(GameFSM);
 
@@ -99,24 +166,51 @@ describe('GameService Integration', () => {
             expect(nextTurn.currentPlayerId).not.toBe(currentPlayerId);
         });
 
-        it('should handle game state correctly', () => {
+        it('should handle game state correctly', async () => {
             // Setup: crear partida con 2 jugadores
-            const room = roomsService.createRoom('standard', 2, 'creator1');
-            roomsService.addPlayer(room.id, 'user1', 'Player1');
-            roomsService.addPlayer(room.id, 'user2', 'Player2');
-            roomsService.pickFaction(room.id, 'user1', 'human' as any);
-            roomsService.pickFaction(room.id, 'user2', 'orc' as any);
-            roomsService.pickHero(room.id, 'user1', 'merchant' as any);
-            roomsService.pickHero(room.id, 'user2', 'battler' as any);
-            roomsService.setPlayerReady(room.id, 'user1', true);
-            roomsService.setPlayerReady(room.id, 'user2', true);
-            roomsService.startMatch(room.id);
+            const mockRoom = {
+                id: 'test-room-id',
+                mode: 'standard',
+                maxPlayers: 2,
+                status: 'waiting',
+                players: [],
+                creatorId: 'creator1',
+                save: jest.fn().mockResolvedValue(true),
+            };
+
+            mockRoomModel.create = jest.fn().mockReturnValue(mockRoom);
+            const room = await roomsService.createRoom('standard', 2, 'creator1');
+
+            mockRoomModel.findOne = jest.fn().mockReturnValue({
+                exec: jest.fn().mockResolvedValue(mockRoom),
+            });
+
+            await roomsService.addPlayer(room.id, 'user1', 'Player1');
+            await roomsService.addPlayer(room.id, 'user2', 'Player2');
+            await roomsService.pickFaction(room.id, 'user1', 'human' as any);
+            await roomsService.pickFaction(room.id, 'user2', 'orc' as any);
+            await roomsService.pickHero(room.id, 'user1', 'merchant' as any);
+            await roomsService.pickHero(room.id, 'user2', 'battler' as any);
+            await roomsService.setPlayerReady(room.id, 'user1', true);
+            await roomsService.setPlayerReady(room.id, 'user2', true);
+
+            mockRoom.status = 'in_progress';
+            mockRoom.startedAt = new Date();
+            await roomsService.startMatch(room.id);
 
             // Verificar que el room está en estado 'in_progress'
-            const roomAfterStart = roomsService.getRoom(room.id);
+            const roomAfterStart = await roomsService.getRoom(room.id);
             expect(roomAfterStart?.status).toBe('in_progress');
 
-            const fsm = gameService.startGame(room.id);
+            // Mock para startGame
+            mockMatchModel.create = jest.fn().mockReturnValue({
+                save: jest.fn().mockResolvedValue({}),
+            });
+            mockSnapshotModel.create = jest.fn().mockReturnValue({
+                save: jest.fn().mockResolvedValue({}),
+            });
+
+            const fsm = await gameService.startGame(room.id);
             expect(fsm).toBeDefined();
             expect(fsm).not.toBeNull();
 
@@ -138,4 +232,3 @@ describe('GameService Integration', () => {
         });
     });
 });
-

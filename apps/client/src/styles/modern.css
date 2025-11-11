@@ -1,0 +1,213 @@
+/* Estilos Modernos/Retro para Warpath */
+
+/* Variables de color - estilo moderno */
+:root {
+    --bg-dark: #0a0a0f;
+    --bg-darker: #050508;
+    --bg-panel: #1a1a2e;
+    --bg-panel-hover: #16213e;
+    --accent: #00d4ff;
+    --accent-dark: #0099cc;
+    --accent-gold: #ffd700;
+    --accent-gold-dark: #ffb300;
+    --text-primary: #ffffff;
+    --text-secondary: #b0b0b0;
+    --text-muted: #707070;
+    --border: #2a2a3e;
+    --border-light: #3a3a4e;
+    --success: #00ff88;
+    --danger: #ff4444;
+    --warning: #ffaa00;
+}
+
+/* Fuentes modernas */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
+
+body {
+    font-family: 'Rajdhani', sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+/* Botones modernos */
+.modern-button {
+    font-family: 'Orbitron', sans-serif;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+    border: 2px solid var(--accent);
+    color: var(--bg-dark);
+    padding: 14px 28px;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 
+        0 4px 12px rgba(0, 212, 255, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    position: relative;
+    overflow: hidden;
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.modern-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.4s ease;
+}
+
+.modern-button:hover::before {
+    left: 100%;
+}
+
+.modern-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 
+        0 6px 20px rgba(0, 212, 255, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    border-color: var(--accent-gold);
+}
+
+.modern-button:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 
+        0 2px 8px rgba(0, 212, 255, 0.3),
+        inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.modern-button.active {
+    background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-gold-dark) 100%);
+    border-color: var(--accent-gold);
+    color: var(--bg-dark);
+    box-shadow: 
+        0 4px 16px rgba(255, 215, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.modern-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: grayscale(0.6);
+}
+
+.modern-button.danger {
+    background: linear-gradient(135deg, var(--danger) 0%, #cc0000 100%);
+    border-color: var(--danger);
+    box-shadow: 0 4px 12px rgba(255, 68, 68, 0.3);
+}
+
+.modern-button.success {
+    background: linear-gradient(135deg, var(--success) 0%, #00cc66 100%);
+    border-color: var(--success);
+    box-shadow: 0 4px 12px rgba(0, 255, 136, 0.3);
+}
+
+.modern-button.secondary {
+    background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-panel-hover) 100%);
+    border-color: var(--border-light);
+    color: var(--text-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Paneles modernos */
+.modern-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+}
+
+.modern-panel-header {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+/* Inputs modernos */
+.modern-input {
+    background: var(--bg-darker);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: var(--text-primary);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    transition: all 0.2s ease;
+}
+
+.modern-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.2);
+}
+
+/* Scrollbar moderno */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-darker);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 5px;
+    border: 2px solid var(--bg-darker);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-gold);
+}
+
+/* Animaciones */
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.8);
+    }
+}
+
+.pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes slide-in {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.slide-in {
+    animation: slide-in 0.3s ease-out;
+}
+

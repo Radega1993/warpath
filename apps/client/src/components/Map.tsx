@@ -145,10 +145,11 @@ export default function Map({ onTerritoryClick }: MapProps) {
     };
 
     return (
-        <div className="w-full h-full bg-gray-800 rounded-lg p-4 overflow-auto">
+        <div className="w-full h-full relative overflow-hidden bg-[#050508]">
+
             <svg
                 viewBox="0 0 1000 800"
-                className="w-full h-full"
+                className="w-full h-full relative z-10"
                 style={{ minHeight: '600px' }}
             >
                 {/* Render territories */}
@@ -162,25 +163,62 @@ export default function Map({ onTerritoryClick }: MapProps) {
                     const isFortifyOrigin = fortifyFrom === territory.id;
                     const isAdjacentToOrigin = attackFrom ? isAdjacent(territory.id) : false;
 
-                    // Determinar color del borde
-                    let strokeColor = '#1F2937';
+                    // Determinar color del borde y efectos
+                    let strokeColor = '#2a2a3e'; // Color moderno por defecto
                     let strokeWidth = 2;
+                    let filter = '';
+                    let className = 'cursor-pointer transition-all duration-300';
+
                     if (selected) {
-                        strokeColor = '#FCD34D'; // Amarillo para seleccionado
+                        strokeColor = '#00d4ff'; // Cyan para seleccionado
                         strokeWidth = 4;
+                        filter = 'url(#glow-cyan)';
+                        className += ' pulse-glow';
                     } else if (isAttackOrigin) {
-                        strokeColor = '#EF4444'; // Rojo para origen de ataque
+                        strokeColor = '#ff4444'; // Rojo para origen de ataque
                         strokeWidth = 4;
+                        filter = 'url(#glow-red)';
                     } else if (isFortifyOrigin) {
-                        strokeColor = '#3B82F6'; // Azul para origen de fortificar
+                        strokeColor = '#00d4ff'; // Cyan para origen de fortificar
                         strokeWidth = 4;
+                        filter = 'url(#glow-cyan)';
                     } else if (isAdjacentToOrigin && gameState?.phase === 'attack') {
-                        strokeColor = '#F59E0B'; // Naranja para adyacentes en fase de ataque
+                        strokeColor = '#ffaa00'; // Naranja para adyacentes en fase de ataque
                         strokeWidth = 3;
                     }
 
+                    // Efecto hover
+                    className += ' hover:opacity-90 hover:scale-110';
+
                     return (
                         <g key={territory.id}>
+                            {/* Filtros de glow */}
+                            <defs>
+                                <filter id="glow-cyan">
+                                    <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+                                    <feMerge>
+                                        <feMergeNode in="coloredBlur" />
+                                        <feMergeNode in="SourceGraphic" />
+                                    </feMerge>
+                                </filter>
+                                <filter id="glow-red">
+                                    <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+                                    <feMerge>
+                                        <feMergeNode in="coloredBlur" />
+                                        <feMergeNode in="SourceGraphic" />
+                                    </feMerge>
+                                </filter>
+                            </defs>
+
+                            {/* Sombra del territorio */}
+                            <circle
+                                cx={x + 2}
+                                cy={y + 2}
+                                r={40}
+                                fill="rgba(0, 0, 0, 0.5)"
+                                className="pointer-events-none"
+                            />
+
                             {/* Territory circle */}
                             <circle
                                 cx={x}
@@ -189,51 +227,98 @@ export default function Map({ onTerritoryClick }: MapProps) {
                                 fill={color}
                                 stroke={strokeColor}
                                 strokeWidth={strokeWidth}
-                                className="cursor-pointer hover:opacity-80 transition-opacity"
+                                filter={filter}
+                                className={className}
                                 onClick={() => handleTerritoryClick(territory.id)}
+                                style={{
+                                    filter: selected ? 'drop-shadow(0 0 15px #00d4ff)' : undefined
+                                }}
                             />
 
-                            {/* Territory label */}
+                            {/* Borde interior para profundidad */}
+                            <circle
+                                cx={x}
+                                cy={y}
+                                r={36}
+                                fill="none"
+                                stroke="rgba(255, 255, 255, 0.15)"
+                                strokeWidth={1}
+                                className="pointer-events-none"
+                            />
+
+                            {/* Badge con número de tropas */}
+                            <g className="pointer-events-none">
+                                {/* Fondo del badge */}
+                                <circle
+                                    cx={x}
+                                    cy={y}
+                                    r={18}
+                                    fill="#1a1a2e"
+                                    stroke="#00d4ff"
+                                    strokeWidth={2}
+                                />
+                                {/* Número de tropas */}
+                                <text
+                                    x={x}
+                                    y={y + 6}
+                                    textAnchor="middle"
+                                    fill="#00d4ff"
+                                    fontSize="16"
+                                    fontWeight="bold"
+                                    fontFamily="Orbitron, sans-serif"
+                                >
+                                    {troopCount}
+                                </text>
+                            </g>
+
+                            {/* Nombre del territorio */}
                             <text
                                 x={x}
-                                y={y - 50}
+                                y={y - 55}
                                 textAnchor="middle"
-                                fill="white"
-                                fontSize="12"
-                                fontWeight="bold"
+                                fill="#ffffff"
+                                fontSize="11"
+                                fontWeight="600"
+                                fontFamily="Rajdhani, sans-serif"
                                 className="pointer-events-none"
+                                style={{
+                                    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)'
+                                }}
                             >
                                 {territory.name}
                             </text>
 
-                            {/* Troop count */}
-                            <text
-                                x={x}
-                                y={y + 5}
-                                textAnchor="middle"
-                                fill="white"
-                                fontSize="16"
-                                fontWeight="bold"
-                                className="pointer-events-none"
-                            >
-                                {troopCount}
-                            </text>
-
-                            {/* Zone indicator */}
+                            {/* Zone indicator con icono */}
                             {territory.zone && territory.zone !== 'none' && (
-                                <circle
-                                    cx={x + 30}
-                                    cy={y - 30}
-                                    r={8}
-                                    fill="#FCD34D"
-                                    className="pointer-events-none"
-                                />
+                                <g className="pointer-events-none">
+                                    <circle
+                                        cx={x + 30}
+                                        cy={y - 30}
+                                        r={14}
+                                        fill="#1a1a2e"
+                                        stroke="#ffd700"
+                                        strokeWidth={2}
+                                    />
+                                    <text
+                                        x={x + 30}
+                                        y={y - 25}
+                                        textAnchor="middle"
+                                        fontSize="16"
+                                    >
+                                        {territory.zone === 'oro' ? '💰' :
+                                            territory.zone === 'reclutamiento' ? '⚔️' :
+                                                territory.zone === 'veloz' ? '⚡' :
+                                                    territory.zone === 'batalla' ? '🗡️' :
+                                                        territory.zone === 'amurallada' ? '🏰' :
+                                                            territory.zone === 'defensiva' ? '🛡️' : '⭐'}
+                                    </text>
+                                </g>
                             )}
                         </g>
                     );
                 })}
 
-                {/* Render connections (adjacencies) */}
+                {/* Render connections (adjacencies) - solo visibles al hover */}
                 {(mapData.adjacencies as [string, string][] | undefined)?.map((adjacency: [string, string]) => {
                     const [fromId, toId] = adjacency;
                     const from = mapData.territories.find((t: any) => t.id === fromId);
@@ -245,6 +330,11 @@ export default function Map({ onTerritoryClick }: MapProps) {
                     const x2 = (to as any).x || 0;
                     const y2 = (to as any).y || 0;
 
+                    // Mostrar conexiones solo si uno de los territorios está seleccionado o es adyacente
+                    const shouldShow = selectedTerritory === fromId || selectedTerritory === toId ||
+                        attackFrom === fromId || attackFrom === toId ||
+                        fortifyFrom === fromId || fortifyFrom === toId;
+
                     return (
                         <line
                             key={`${fromId}-${toId}`}
@@ -252,9 +342,10 @@ export default function Map({ onTerritoryClick }: MapProps) {
                             y1={y1}
                             x2={x2}
                             y2={y2}
-                            stroke="#4B5563"
-                            strokeWidth="2"
-                            className="pointer-events-none"
+                            stroke={shouldShow ? 'rgba(0, 212, 255, 0.6)' : 'rgba(42, 42, 62, 0.3)'}
+                            strokeWidth={shouldShow ? 2 : 1}
+                            strokeDasharray={shouldShow ? '0' : '5,5'}
+                            className="pointer-events-none transition-all duration-300"
                         />
                     );
                 })}

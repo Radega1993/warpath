@@ -20,7 +20,7 @@ describe('GameGateway', () => {
             emit: jest.fn(),
         };
         const mockGameService = {
-            startGame: jest.fn(),
+            startGame: jest.fn().mockResolvedValue(null),
             getGame: jest.fn(),
             serializeGameState: jest.fn(),
             deployTroops: jest.fn(),
@@ -28,6 +28,7 @@ describe('GameGateway', () => {
             fortify: jest.fn(),
             upgradePath: jest.fn(),
             endTurn: jest.fn(),
+            endGame: jest.fn().mockResolvedValue(undefined),
             convertTroops: jest.fn(),
         };
 
@@ -38,11 +39,13 @@ describe('GameGateway', () => {
         };
 
         const mockRoomsService = {
-            getRoom: jest.fn(),
+            getRoom: jest.fn().mockResolvedValue(null),
         };
 
         const mockMatchService = {
-            saveSnapshot: jest.fn(),
+            getMatch: jest.fn().mockResolvedValue(null),
+            saveSnapshot: jest.fn().mockResolvedValue(undefined),
+            endMatch: jest.fn().mockResolvedValue(undefined),
         };
 
         const mockTelemetryService = {
@@ -272,8 +275,9 @@ describe('GameGateway', () => {
             (timerService.stopTimer as jest.Mock).mockReturnValue(undefined);
             (timerService.startTimer as jest.Mock).mockReturnValue(undefined);
             (timerService.getSecondsLeft as jest.Mock).mockReturnValue(120);
+            (matchService.saveSnapshot as jest.Mock).mockResolvedValue(undefined);
 
-            gateway.handleEndTurn(
+            await gateway.handleEndTurn(
                 mockSocket as AuthenticatedSocket,
             );
 

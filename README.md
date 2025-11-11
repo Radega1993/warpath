@@ -9,7 +9,19 @@ Este es un monorepo con las siguientes partes:
 - `packages/rules-engine`: Motor de reglas del juego (TypeScript puro, sin I/O)
 - `packages/shared`: Tipos y datos compartidos (mapa, etc.)
 - `apps/server`: Backend NestJS con Socket.IO
-- `apps/client`: Frontend React + TypeScript + Vite
+- `apps/client`: Frontend React + TypeScript + Vite con sistema de diseño moderno/retro
+
+## Documentación
+
+La documentación completa del proyecto está en el directorio `docs/`:
+
+- **Arquitectura**: `docs/arquitectura.md` - Stack tecnológico y decisiones de diseño
+- **Estado del Proyecto**: `docs/estado-proyecto.md` - Estado actual y progreso
+- **Estilos UI**: `docs/estilos-ui.md` - Guía completa del sistema de diseño
+- **Roadmap**: `docs/roadmap.md` - Plan de desarrollo
+- **Contratos WebSocket**: `docs/contratos-ws.md` - Especificación de eventos
+- **Setup MongoDB**: `docs/mongodb-setup.md` - Configuración de base de datos
+- **Sentry**: `docs/sentry-setup.md` - Configuración de monitoreo
 
 ## Instalación
 
@@ -47,6 +59,11 @@ El servidor se iniciará en `http://localhost:3001` con:
   - `/` - Auth Gateway
   - `/lobby` - Rooms Gateway
   - `/room/:id` - Game Gateway
+
+**Nota:** Asegúrate de que MongoDB esté corriendo antes de iniciar el servidor:
+```bash
+docker compose up -d mongodb
+```
 
 #### Frontend (React + Vite)
 
@@ -115,7 +132,8 @@ npm run test:simulate --workspace=@warpath/rules-engine
 - [x] Timers en memoria (120s por turno)
 - [x] Snapshots por turno
 - [x] Telemetría básica
-- [x] **32 tests pasando** (13 tests fallando por problemas de mocking, no del código)
+- [x] **Base de datos MongoDB** con Mongoose
+- [x] **45 tests actualizados para MongoDB** (pendiente ejecutar)
 
 #### Semana 3 - Frontend ✅
 - [x] Estructura React + TypeScript + Vite
@@ -132,10 +150,23 @@ npm run test:simulate --workspace=@warpath/rules-engine
 - [x] Log de combate (CombatLog)
 - [x] Pantalla de Resultados
 
+#### Semana 4 - Economía, Zonas y Caminos ✅
+- [x] Todos los caminos implementados (CLAN, TREASURE, POWER, LAND, WAR, LUCK)
+- [x] Todas las zonas implementadas (ORO, BATALLA, AMURALLADA, DEFENSIVA, VELOZ, RECLUTAMIENTO)
+- [x] Nivel de Clan y efectos
+- [x] Balance.json creado
+
+#### Semana 5 - Pulido y Estabilidad ⏳
+- [x] Base de datos MongoDB migrada
+- [x] Reconexión robusta (reconexión automática, restauración de estado, notificaciones)
+- [x] Rate-limiting (protección contra spam, límites por acción)
+- [x] Sentry (monitoreo de errores front/back, Session Replay, Performance)
+- [ ] Modo Bots
+- [ ] Pruebas de carga
+
 ### ⏳ Pendiente
 
-- [ ] Economía, Zonas y Caminos completos - Semana 4
-- [ ] Pulido y estabilidad - Semana 5
+- [ ] Pulido y estabilidad - Semana 5 (en progreso)
 - [ ] Beta pública - Semana 6
 
 Ver [docs/estado-proyecto.md](./docs/estado-proyecto.md) para detalles completos.
@@ -143,8 +174,15 @@ Ver [docs/estado-proyecto.md](./docs/estado-proyecto.md) para detalles completos
 ### Estado de Tests
 
 - **Rules Engine:** ✅ 97/97 tests pasando (100%)
-- **Backend:** ✅ 45/45 tests pasando (100%)
+- **Backend:** ✅ 45/45 tests actualizados para MongoDB (pendiente ejecutar)
 - **Frontend:** ⏳ Tests no implementados aún
+
+### Base de Datos
+
+- **MongoDB:** ✅ Integrada con Mongoose
+- **Docker Compose:** ✅ Configurado (puerto 27018)
+- **Esquemas:** Room, Match, MatchSnapshot, User
+- Ver [docs/mongodb-setup.md](./docs/mongodb-setup.md) para más detalles
 
 Ver [docs/test-results.md](./docs/test-results.md) para detalles completos de los tests.
 

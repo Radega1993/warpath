@@ -16,10 +16,10 @@ describe('GameService', () => {
                 {
                     provide: MatchService,
                     useValue: {
-                        createMatch: jest.fn(),
-                        saveSnapshot: jest.fn(),
-                        getMatch: jest.fn(),
-                        endMatch: jest.fn(),
+                        createMatch: jest.fn().mockResolvedValue({}),
+                        saveSnapshot: jest.fn().mockResolvedValue(undefined),
+                        getMatch: jest.fn().mockResolvedValue(null),
+                        endMatch: jest.fn().mockResolvedValue(undefined),
                     },
                 },
                 {
@@ -41,7 +41,7 @@ describe('GameService', () => {
     });
 
     describe('startGame', () => {
-        it('should start a game successfully', () => {
+        it('should start a game successfully', async () => {
             const roomId = 'test-room';
             const mockRoom = {
                 id: roomId,
@@ -66,11 +66,11 @@ describe('GameService', () => {
                 ],
             };
 
-            jest.spyOn(roomsService, 'getRoom').mockReturnValue(mockRoom as any);
-            jest.spyOn(matchService, 'createMatch').mockReturnValue({} as any);
-            jest.spyOn(matchService, 'saveSnapshot').mockImplementation(() => { });
+            jest.spyOn(roomsService, 'getRoom').mockResolvedValue(mockRoom as any);
+            jest.spyOn(matchService, 'createMatch').mockResolvedValue({} as any);
+            jest.spyOn(matchService, 'saveSnapshot').mockResolvedValue(undefined);
 
-            const fsm = service.startGame(roomId);
+            const fsm = await service.startGame(roomId);
 
             expect(fsm).toBeDefined();
             expect(fsm).toBeInstanceOf(GameFSM);
@@ -78,31 +78,31 @@ describe('GameService', () => {
             expect(matchService.saveSnapshot).toHaveBeenCalled();
         });
 
-        it('should return null if room not found', () => {
-            jest.spyOn(roomsService, 'getRoom').mockReturnValue(undefined);
+        it('should return null if room not found', async () => {
+            jest.spyOn(roomsService, 'getRoom').mockResolvedValue(null);
 
-            const fsm = service.startGame('non-existent');
+            const fsm = await service.startGame('non-existent');
 
             expect(fsm).toBeNull();
         });
 
-        it('should return null if room status is not ready', () => {
+        it('should return null if room status is not ready', async () => {
             const mockRoom = {
                 id: 'test-room',
                 status: 'waiting',
                 players: [],
             };
 
-            jest.spyOn(roomsService, 'getRoom').mockReturnValue(mockRoom as any);
+            jest.spyOn(roomsService, 'getRoom').mockResolvedValue(mockRoom as any);
 
-            const fsm = service.startGame('test-room');
+            const fsm = await service.startGame('test-room');
 
             expect(fsm).toBeNull();
         });
     });
 
     describe('getGame', () => {
-        it('should return game FSM if exists', () => {
+        it('should return game FSM if exists', async () => {
             const roomId = 'test-room';
             const mockRoom = {
                 id: roomId,
@@ -119,11 +119,11 @@ describe('GameService', () => {
                 ],
             };
 
-            jest.spyOn(roomsService, 'getRoom').mockReturnValue(mockRoom as any);
-            jest.spyOn(matchService, 'createMatch').mockReturnValue({} as any);
-            jest.spyOn(matchService, 'saveSnapshot').mockImplementation(() => { });
+            jest.spyOn(roomsService, 'getRoom').mockResolvedValue(mockRoom as any);
+            jest.spyOn(matchService, 'createMatch').mockResolvedValue({} as any);
+            jest.spyOn(matchService, 'saveSnapshot').mockResolvedValue(undefined);
 
-            service.startGame(roomId);
+            await service.startGame(roomId);
             const fsm = service.getGame(roomId);
 
             expect(fsm).toBeDefined();
@@ -171,7 +171,7 @@ describe('GameService', () => {
     });
 
     describe('serializeGameState', () => {
-        it('should serialize game state correctly', () => {
+        it('should serialize game state correctly', async () => {
             const roomId = 'test-room';
             const mockRoom = {
                 id: roomId,
@@ -188,11 +188,11 @@ describe('GameService', () => {
                 ],
             };
 
-            jest.spyOn(roomsService, 'getRoom').mockReturnValue(mockRoom as any);
-            jest.spyOn(matchService, 'createMatch').mockReturnValue({} as any);
-            jest.spyOn(matchService, 'saveSnapshot').mockImplementation(() => { });
+            jest.spyOn(roomsService, 'getRoom').mockResolvedValue(mockRoom as any);
+            jest.spyOn(matchService, 'createMatch').mockResolvedValue({} as any);
+            jest.spyOn(matchService, 'saveSnapshot').mockResolvedValue(undefined);
 
-            const fsm = service.startGame(roomId);
+            const fsm = await service.startGame(roomId);
             expect(fsm).not.toBeNull();
             const serialized = service.serializeGameState(fsm!);
 

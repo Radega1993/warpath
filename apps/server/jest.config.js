@@ -1,23 +1,22 @@
 module.exports = {
+    testEnvironment: 'node',
     moduleFileExtensions: ['js', 'json', 'ts'],
-    rootDir: 'src',
-    testRegex: '.*\\.spec\\.ts$',
+    testRegex: 'src/.*\\.spec\\.ts$',
     transform: {
-        '^.+\\.(t|j)s$': ['ts-jest', { allowJs: true }],
+        '^.+\\.(t|j)s$': ['@swc/jest'],
     },
     transformIgnorePatterns: [
         'node_modules/(?!(@warpath)/)',
     ],
     collectCoverageFrom: [
-        '**/*.(t|j)s',
-        '!**/*.spec.ts',
-        '!**/node_modules/**',
-        '!**/dist/**',
+        'src/**/*.(t|j)s',
+        '!src/**/*.spec.ts',
+        '!src/**/node_modules/**',
+        '!src/**/dist/**',
     ],
-    coverageDirectory: '../coverage',
-    testEnvironment: 'node',
+    coverageDirectory: 'coverage',
     moduleNameMapper: {
-        '^@/(.*)$': '<rootDir>/$1',
+        '^@/(.*)$': '<rootDir>/src/$1',
     },
 };
 

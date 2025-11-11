@@ -6,6 +6,15 @@ import {
     CombatResult,
     CombatModifiers
 } from './types';
+import { GameConfig, DEFAULT_CONFIG } from './config';
+
+/**
+ * Obtiene el dado para un rango desde la configuración
+ */
+function getRankDice(rank: UnitRank, config: GameConfig): number {
+    const rankKey = rank.toLowerCase().replace('d', '') as keyof typeof config.rankDice;
+    return config.rankDice[rankKey] || RANK_DICE[rank] || 4;
+}
 
 /**
  * Resuelve un combate entre atacante y defensor
@@ -14,7 +23,8 @@ export function resolveCombat(
     attackerTroops: Troops,
     defenderTroops: Troops,
     modifiers: CombatModifiers,
-    rng: SeededRNG
+    rng: SeededRNG,
+    config: GameConfig = DEFAULT_CONFIG
 ): CombatResult {
     // Aplicar límite de tropas si existe (Zona Defensiva)
     const maxTroops = modifiers.maxTroopsPerSide;
@@ -34,29 +44,30 @@ export function resolveCombat(
     for (const rank of Object.keys(attackerCommits) as UnitRank[]) {
         const count = attackerCommits[rank];
         for (let i = 0; i < count; i++) {
-            let roll = rng.rollDice(RANK_DICE[rank]);
+            const maxDice = getRankDice(rank, config);
+            let roll = rng.rollDice(maxDice);
 
             // Aplicar eficacia (+1 al dado)
             if (modifiers.attackerEfficiency) {
-                roll = Math.min(roll + 1, RANK_DICE[rank]);
+                roll = Math.min(roll + 1, maxDice);
             }
 
             // Camino de la Suerte N3: boost a élites (+1 al dado de élites)
             if (rank === UnitRank.ELITE && modifiers.luckBoostElites) {
-                roll = Math.min(roll + 1, RANK_DICE[rank]);
+                roll = Math.min(roll + 1, maxDice);
             }
 
             // Aplicar rerolls (puede haber múltiples rerolls)
             if (modifiers.attackerRerolls > 0) {
                 for (let r = 0; r < modifiers.attackerRerolls; r++) {
-                    const reroll = rng.rollDice(RANK_DICE[rank]);
+                    const reroll = rng.rollDice(maxDice);
                     let adjustedReroll = reroll;
                     if (modifiers.attackerEfficiency) {
-                        adjustedReroll = Math.min(reroll + 1, RANK_DICE[rank]);
+                        adjustedReroll = Math.min(reroll + 1, maxDice);
                     }
                     // Boost a élites también en rerolls
                     if (rank === UnitRank.ELITE && modifiers.luckBoostElites) {
-                        adjustedReroll = Math.min(adjustedReroll + 1, RANK_DICE[rank]);
+                        adjustedReroll = Math.min(adjustedReroll + 1, maxDice);
                     }
                     roll = Math.max(roll, adjustedReroll);
                 }
@@ -71,34 +82,58 @@ export function resolveCombat(
     for (const rank of Object.keys(defenderCommits) as UnitRank[]) {
         const count = defenderCommits[rank];
         for (let i = 0; i < count; i++) {
-            let roll = rng.rollDice(RANK_DICE[rank]);
+            const maxDice = getRankDice(rank, config);
+            let roll = rng.rollDice(maxDice);
 
             // Aplicar eficacia (+1 al dado)
             if (modifiers.defenderEfficiency) {
-                roll = Math.min(roll + 1, RANK_DICE[rank]);
+                roll = Math.min(roll + 1, maxDice);
             }
 
             // Aplicar bonificación de defensa (Zona Amurallada: +2)
             if (modifiers.defenderDefenseBonus > 0) {
-                roll = Math.min(roll + modifiers.defenderDefenseBonus, RANK_DICE[rank]);
+                roll = Math.min(roll + modifiers.defenderDefenseBonus, maxDice);
             }
+
+            // Consolidar: +2 dados (2 exploradores adicionales)
+            // Esto se aplica añadiendo 2 tiradas de explorador al final
 
             // Aplicar rerolls (puede haber múltiples rerolls)
             if (modifiers.defenderRerolls > 0) {
                 for (let r = 0; r < modifiers.defenderRerolls; r++) {
-                    const reroll = rng.rollDice(RANK_DICE[rank]);
+                    const reroll = rng.rollDice(maxDice);
                     let adjustedReroll = reroll;
                     if (modifiers.defenderEfficiency) {
-                        adjustedReroll = Math.min(adjustedReroll + 1, RANK_DICE[rank]);
+                        adjustedReroll = Math.min(adjustedReroll + 1, maxDice);
                     }
                     if (modifiers.defenderDefenseBonus > 0) {
-                        adjustedReroll = Math.min(adjustedReroll + modifiers.defenderDefenseBonus, RANK_DICE[rank]);
+                        adjustedReroll = Math.min(adjustedReroll + modifiers.defenderDefenseBonus, maxDice);
                     }
                     roll = Math.max(roll, adjustedReroll);
                 }
             }
 
             defenderRolls.push({ rank, roll });
+        }
+    }
+
+    // Consolidar: añadir +2 dados (2 exploradores) si está consolidado
+    if (modifiers.defenderConsolidated) {
+        const explorerDice = getRankDice(UnitRank.EXPLORER, config);
+        for (let i = 0; i < 2; i++) {
+            let roll = rng.rollDice(explorerDice);
+
+            // Aplicar eficacia si está activa
+            if (modifiers.defenderEfficiency) {
+                roll = Math.min(roll + 1, explorerDice);
+            }
+
+            // Aplicar bonificación de defensa
+            if (modifiers.defenderDefenseBonus > 0) {
+                roll = Math.min(roll + modifiers.defenderDefenseBonus, explorerDice);
+            }
+
+            defenderRolls.push({ rank: UnitRank.EXPLORER, roll });
         }
     }
 
@@ -114,8 +149,9 @@ export function resolveCombat(
         const attackerRoll = attackerRolls[i];
         const defenderRoll = defenderRolls[i];
 
-        // Regla de daño ≥8: detener si el daño acumulado alcanza 8
-        if (totalDamage >= 8) {
+        // Regla de daño: detener si el daño acumulado alcanza el umbral
+        const damageThreshold = config.combat.damageThreshold || 8;
+        if (totalDamage >= damageThreshold) {
             break;
         }
 
@@ -136,8 +172,8 @@ export function resolveCombat(
                 totalDamage += attackerRoll.roll;
             } else {
                 // Distinto rango: gana el superior
-                const attackerRankValue = getRankValue(attackerRoll.rank);
-                const defenderRankValue = getRankValue(defenderRoll.rank);
+                const attackerRankValue = getRankValue(attackerRoll.rank, config);
+                const defenderRankValue = getRankValue(defenderRoll.rank, config);
 
                 if (attackerRankValue > defenderRankValue) {
                     defenderLosses[defenderRoll.rank]++;
@@ -219,7 +255,7 @@ export function sumTroops(troops: Troops): number {
 /**
  * Obtiene el valor numérico de un rango (para comparación)
  */
-function getRankValue(rank: UnitRank): number {
-    return RANK_DICE[rank];
+function getRankValue(rank: UnitRank, config: GameConfig): number {
+    return getRankDice(rank, config);
 }
 

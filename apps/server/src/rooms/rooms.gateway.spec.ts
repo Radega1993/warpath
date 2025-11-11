@@ -25,14 +25,14 @@ describe('RoomsGateway', () => {
             socketsJoin: jest.fn(),
         };
         const mockRoomsService = {
-            createRoom: jest.fn(),
-            getRoom: jest.fn(),
-            addPlayer: jest.fn(),
-            removePlayer: jest.fn(),
-            pickFaction: jest.fn(),
-            pickHero: jest.fn(),
-            setPlayerReady: jest.fn(),
-            startMatch: jest.fn(),
+            createRoom: jest.fn().mockResolvedValue({}),
+            getRoom: jest.fn().mockResolvedValue(null),
+            addPlayer: jest.fn().mockResolvedValue(null),
+            removePlayer: jest.fn().mockResolvedValue(false),
+            pickFaction: jest.fn().mockResolvedValue(false),
+            pickHero: jest.fn().mockResolvedValue(false),
+            setPlayerReady: jest.fn().mockResolvedValue(false),
+            startMatch: jest.fn().mockResolvedValue(false),
         };
 
         const mockAuthService = {
@@ -47,7 +47,7 @@ describe('RoomsGateway', () => {
         };
 
         const mockGameService = {
-            startGame: jest.fn(),
+            startGame: jest.fn().mockResolvedValue(null),
             serializeGameState: jest.fn(),
         };
 
@@ -108,20 +108,20 @@ describe('RoomsGateway', () => {
                 creatorId: 'user-123',
             };
 
-            (roomsService.createRoom as jest.Mock).mockReturnValue(mockRoom);
-            (roomsService.addPlayer as jest.Mock).mockReturnValue({ userId: 'user-123', handle: 'Player' });
-            (roomsService.getRoom as jest.Mock).mockReturnValue(mockRoom);
+            (roomsService.createRoom as jest.Mock).mockResolvedValue(mockRoom);
+            (roomsService.addPlayer as jest.Mock).mockResolvedValue({ userId: 'user-123', handle: 'Player' });
+            (roomsService.getRoom as jest.Mock).mockResolvedValue(mockRoom);
             (usersService.createOrUpdateUser as jest.Mock).mockReturnValue(undefined);
 
             // Usar setTimeout para esperar el broadcastRoomUpdate
-            const result = gateway.handleCreateRoom(
+            await gateway.handleCreateRoom(
                 mockSocket as AuthenticatedSocket,
                 { mode: 'standard', maxPlayers: 2 },
             );
 
             expect(roomsService.createRoom).toHaveBeenCalledWith('standard', 2, 'user-123');
             expect(mockSocket.emit).toHaveBeenCalledWith('room_created', { roomId: mockRoom.id });
-            
+
             // Esperar un poco para que se ejecute el setTimeout
             await new Promise(resolve => setTimeout(resolve, 20));
         });
@@ -154,14 +154,14 @@ describe('RoomsGateway', () => {
             const validRoomId = '123e4567-e89b-12d3-a456-426614174000';
             // El mockRoom.id debe coincidir con el validRoomId para que el código funcione
             mockRoom.id = validRoomId;
-            
-            (roomsService.getRoom as jest.Mock).mockReturnValue(mockRoom);
-            (roomsService.addPlayer as jest.Mock).mockReturnValue({ userId: 'user-123', handle: 'Player1' });
+
+            (roomsService.getRoom as jest.Mock).mockResolvedValue(mockRoom);
+            (roomsService.addPlayer as jest.Mock).mockResolvedValue({ userId: 'user-123', handle: 'Player1' });
             (usersService.createOrUpdateUser as jest.Mock).mockReturnValue(undefined);
             (authService.validateHandle as jest.Mock).mockReturnValue(true);
 
             // El método no retorna nada, solo emite eventos
-            gateway.handleJoinRoom(
+            await gateway.handleJoinRoom(
                 mockSocket as AuthenticatedSocket,
                 { roomId: validRoomId, handle: 'Player1' },
             );
@@ -169,7 +169,7 @@ describe('RoomsGateway', () => {
             // El código usa room.id, no validated.roomId
             expect(roomsService.addPlayer).toHaveBeenCalledWith(validRoomId, 'user-123', 'Player1');
             expect(mockSocket.join).toHaveBeenCalledWith(validRoomId);
-            
+
             // Esperar un poco para que se ejecute el broadcastRoomUpdate
             await new Promise(resolve => setTimeout(resolve, 20));
         });
@@ -194,11 +194,11 @@ describe('RoomsGateway', () => {
                 players: [{ userId: 'user-123', raceId: RaceType.HUMAN }],
             };
 
-            (roomsService.pickFaction as jest.Mock).mockReturnValue(true);
-            (roomsService.getRoom as jest.Mock).mockReturnValue(mockRoom);
+            (roomsService.pickFaction as jest.Mock).mockResolvedValue(true);
+            (roomsService.getRoom as jest.Mock).mockResolvedValue(mockRoom);
 
             // El método no retorna nada, solo emite eventos
-            gateway.handlePickFaction(
+            await gateway.handlePickFaction(
                 mockSocket as AuthenticatedSocket,
                 { raceId: RaceType.HUMAN },
             );
@@ -214,11 +214,11 @@ describe('RoomsGateway', () => {
                 players: [{ userId: 'user-123', heroId: HeroType.MERCHANT }],
             };
 
-            (roomsService.pickHero as jest.Mock).mockReturnValue(true);
-            (roomsService.getRoom as jest.Mock).mockReturnValue(mockRoom);
+            (roomsService.pickHero as jest.Mock).mockResolvedValue(true);
+            (roomsService.getRoom as jest.Mock).mockResolvedValue(mockRoom);
 
             // El método no retorna nada, solo emite eventos
-            gateway.handlePickHero(
+            await gateway.handlePickHero(
                 mockSocket as AuthenticatedSocket,
                 { heroId: HeroType.MERCHANT },
             );
@@ -250,12 +250,12 @@ describe('RoomsGateway', () => {
                 getState: jest.fn().mockReturnValue(mockGameState),
             };
 
-            (roomsService.getRoom as jest.Mock).mockReturnValue(mockRoom);
-            (roomsService.startMatch as jest.Mock).mockReturnValue(true);
-            (gameService.startGame as jest.Mock).mockReturnValue(mockGameFSM);
+            (roomsService.getRoom as jest.Mock).mockResolvedValue(mockRoom);
+            (roomsService.startMatch as jest.Mock).mockResolvedValue(true);
+            (gameService.startGame as jest.Mock).mockResolvedValue(mockGameFSM);
             (gameService.serializeGameState as jest.Mock).mockReturnValue(mockGameState);
 
-            gateway.handleStartMatch(
+            await gateway.handleStartMatch(
                 mockSocket as AuthenticatedSocket,
             );
 

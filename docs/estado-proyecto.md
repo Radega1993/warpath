@@ -2,7 +2,9 @@
 
 Última actualización: 2025-01-27
 
-**Nota:** Todos los tests del backend están pasando (45/45). La Semana 3 y Semana 4 están completamente finalizadas. Todos los caminos y zonas están implementados y funcionando.
+**Nota reciente:** Se ha completado la estandarización de estilos UI en todas las páginas (Home, Login, Lobby, Room, Game, Admin, Results) con un sistema de diseño moderno/retro consistente. Ver `docs/estilos-ui.md` para detalles.
+
+**Nota:** La Semana 3 y Semana 4 están completamente finalizadas. Todos los caminos y zonas están implementados y funcionando. La migración a MongoDB está completada y el código compila correctamente. Los tests han sido actualizados para usar mocks de MongoDB (pendiente resolver configuración de ts-jest para ejecutarlos).
 
 ## Resumen Ejecutivo
 
@@ -96,9 +98,46 @@ El proyecto Warpath está en desarrollo activo. Se ha completado la **Semana 1**
 - [x] Balance inicial via balance.json (creado)
 
 #### Semana 5 - Pulido y Estabilidad
-- [ ] Reconexión robusta
-- [ ] Rate-limiting de acciones
-- [ ] Sentry (front/back)
+- [x] **Base de datos MongoDB**: Migración completada
+- [x] **Sistema de estilos UI**: Estandarización completada
+  - [x] Sistema de diseño moderno/retro implementado
+  - [x] Paleta de colores consistente (cyan/dorado)
+  - [x] Componentes reutilizables (paneles, botones, inputs)
+  - [x] Estilos aplicados en todas las páginas
+  - [x] Documentación de estilos creada (`docs/estilos-ui.md`)
+- [x] **Reconexión robusta**: Implementada con exponential backoff
+- [x] **Rate-limiting**: Implementado para acciones WebSocket
+- [x] **Sentry**: Integrado para monitoreo de errores (frontend y backend)
+  - [x] Docker Compose con MongoDB (puerto 27018)
+  - [x] Esquemas Mongoose (Room, Match, MatchSnapshot, User)
+  - [x] Servicios migrados (RoomsService, MatchService)
+  - [x] Gateways actualizados (métodos async)
+- [x] **Reconexión robusta**: Implementada
+  - [x] Reconexión automática con exponential backoff (1s → 5s máximo)
+  - [x] Hasta 10 intentos de reconexión por socket
+  - [x] Distingue desconexión manual vs error de red
+  - [x] Restauración automática del estado del juego al reconectar
+  - [x] Componente `ConnectionStatus` con notificaciones visuales
+  - [x] Preservación del userId entre reconexiones
+  - [x] Manejo independiente por namespace (auth, lobby, game)
+- [x] **Rate-limiting de acciones**: Implementado
+  - [x] Servicio `RateLimitService` con tracking por userId y tipo de acción
+  - [x] Guard `RateLimitGuard` aplicado a todos los handlers WebSocket
+  - [x] Límites configurables por acción:
+    - Acciones de juego: place (10/5s), attack (5/3s), fortify (8/5s), move (3/5s), etc.
+    - Acciones de lobby: create_room (5/min), join_room (10/30s), etc.
+    - Límite global: 50 acciones totales por 10 segundos
+  - [x] Limpieza automática de entradas expiradas
+  - [x] Mensajes de error informativos con tiempo de espera
+- [x] **Sentry (front/back)**: Implementado
+  - [x] Configuración de Sentry en backend (NestJS)
+  - [x] Configuración de Sentry en frontend (React)
+  - [x] Captura automática de errores en gateways WebSocket
+  - [x] Error Boundary en React para capturar errores de componentes
+  - [x] Session Replay para sesiones con errores
+  - [x] Performance monitoring (10% en producción, 100% en desarrollo)
+  - [x] Helper para captura de errores WebSocket con contexto
+  - [x] Documentación de setup en `docs/sentry-setup.md`
 - [ ] Modo Bots
 - [ ] Pruebas de carga (50-100 salas simultáneas)
 
@@ -130,6 +169,14 @@ El proyecto Warpath está en desarrollo activo. Se ha completado la **Semana 1**
 - **Nota:** Todos los tests fueron corregidos exitosamente. Los mocks fueron actualizados para reflejar correctamente el comportamiento del código de producción.
 
 ## Próximos Pasos Inmediatos
+
+### Base de Datos ✅ COMPLETADA
+- [x] **Migración a MongoDB**: Completada
+  - [x] Docker Compose configurado
+  - [x] Esquemas Mongoose implementados
+  - [x] Servicios migrados de memoria a MongoDB
+  - [x] Tests actualizados para usar mocks de MongoDB
+  - [x] Código compila correctamente
 
 ### Semana 3 - Frontend ✅ COMPLETADA
 
@@ -191,10 +238,18 @@ El proyecto Warpath está en desarrollo activo. Se ha completado la **Semana 1**
 - 120 segundos por turno con auto-end
 
 ### Persistencia
-- **Base de datos**: No implementada todavía (todo en memoria)
-- Snapshots en memoria (sin DB por ahora)
-- Listo para migrar a PostgreSQL cuando sea necesario (Semana 4 o 5)
+- **Base de datos**: ✅ MongoDB implementada con Mongoose
+  - ✅ Docker Compose configurado (puerto 27018 para evitar conflictos)
+  - ✅ Esquemas de Mongoose creados: Room, Match, MatchSnapshot, User
+  - ✅ RoomsService migrado a MongoDB (métodos async)
+  - ✅ MatchService migrado a MongoDB (métodos async)
+  - ✅ Conexión configurada en app.module.ts con `MONGODB_URI`
+  - ✅ Todos los gateways actualizados para usar métodos async
+  - ✅ Documentación de setup en `docs/mongodb-setup.md`
+- **Snapshots**: Persistidos en MongoDB (MatchSnapshot collection)
 - **Autenticación**: Guest mode con IDs únicos generados en servidor
+- **Migración**: Completada desde memoria a MongoDB
+- **Estado**: Código compila correctamente, tests actualizados (pendiente resolver ts-jest para ejecutar)
 
 ### Validación
 - Zod schemas para validación de DTOs
@@ -212,4 +267,5 @@ El proyecto Warpath está en desarrollo activo. Se ha completado la **Semana 1**
 - [Arquitectura técnica](./arquitectura.md)
 - [Contratos WebSocket](./contratos-ws.md)
 - [Product Backlog](./product-backlog.md)
+- [Configuración MongoDB](./mongodb-setup.md)
 

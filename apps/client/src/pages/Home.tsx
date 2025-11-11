@@ -39,18 +39,18 @@ export default function Home() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
-            <div className="bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-md">
-                <h1 className="text-4xl font-bold text-center mb-2 text-yellow-400">
-                    Warpath
+        <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4 relative overflow-hidden">
+            <div className="modern-panel p-8 w-full max-w-md slide-in">
+                <h1 className="font-['Orbitron'] text-5xl text-center mb-2 text-[#00d4ff] font-bold">
+                    ⚔️ WARPATH
                 </h1>
-                <p className="text-center text-gray-400 mb-8">
+                <p className="text-center text-[#b0b0b0] mb-8 italic font-['Rajdhani']">
                     4X-lite Territorial
                 </p>
 
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium font-['Orbitron'] mb-2 text-[#00d4ff] uppercase tracking-wider">
                             Nombre de jugador
                         </label>
                         <input
@@ -58,7 +58,7 @@ export default function Home() {
                             value={handle}
                             onChange={(e) => setHandle(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleStart()}
-                            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                            className="modern-input w-full"
                             placeholder="Ingresa tu nombre"
                             maxLength={20}
                         />
@@ -66,13 +66,31 @@ export default function Home() {
 
                     <button
                         onClick={handleStart}
-                        className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-4 rounded-lg transition-colors"
+                        className="w-full modern-button"
                     >
-                        Comenzar
+                        <span className="text-3xl">🎮</span>
+                        <span>Comenzar como Invitado</span>
+                    </button>
+
+                    <div className="relative my-4">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t-2 border-[#2a2a3e]"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                            <span className="px-2 bg-[#1a1a2e] text-[#b0b0b0]">o</span>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={() => navigate('/login')}
+                        className="w-full modern-button secondary"
+                    >
+                        <span className="text-3xl">🔐</span>
+                        <span>Iniciar Sesión / Registrarse</span>
                     </button>
                 </div>
 
-                <div className="mt-8 text-center text-sm text-gray-500">
+                <div className="mt-8 text-center text-sm text-[#707070] italic font-['Rajdhani']">
                     <p>MVP - Semana 3</p>
                 </div>
             </div>

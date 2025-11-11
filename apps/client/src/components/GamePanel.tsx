@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { wsService } from '../services/websocket.service';
+import { configService } from '../services/config.service';
 import { mapData } from '@warpath/shared';
 
-// Costes de unidades
-const UNIT_COSTS: Record<string, number> = {
+// Costes de unidades por defecto (fallback)
+const DEFAULT_UNIT_COSTS: Record<string, number> = {
     d4: 150,   // Explorador
     d6: 250,   // Guerrero
     d8: 300,   // Élite
@@ -27,11 +28,37 @@ export default function GamePanel() {
     const [selectedUnits, setSelectedUnits] = useState<Record<string, number>>({
         d4: 0, d6: 0, d8: 0, d12: 0, d20: 0, d100: 0,
     });
+    const [unitCosts, setUnitCosts] = useState<Record<string, number>>(DEFAULT_UNIT_COSTS);
+
+    // Estado para la acción "Mover"
+    const [moveFrom, setMoveFrom] = useState<string | null>(null);
+    const [moveDestinations, setMoveDestinations] = useState<Array<{ territoryId: string; units: Record<string, number> }>>([]);
+    const [isMoveMode, setIsMoveMode] = useState(false);
+
+    // Cargar configuración al montar el componente
+    useEffect(() => {
+        configService.getConfig().then(config => {
+            if (config.unitCosts) {
+                // Mapear de formato BD (explorer, warrior, etc.) a formato UI (d4, d6, etc.)
+                const costs: Record<string, number> = {
+                    d4: config.unitCosts.explorer || DEFAULT_UNIT_COSTS.d4,
+                    d6: config.unitCosts.warrior || DEFAULT_UNIT_COSTS.d6,
+                    d8: config.unitCosts.elite || DEFAULT_UNIT_COSTS.d8,
+                    d12: config.unitCosts.hero || DEFAULT_UNIT_COSTS.d12,
+                    d20: config.unitCosts.chief || DEFAULT_UNIT_COSTS.d20,
+                    d100: config.unitCosts.legend || DEFAULT_UNIT_COSTS.d100,
+                };
+                setUnitCosts(costs);
+            }
+        }).catch(err => {
+            console.warn('Error loading config, using defaults:', err);
+        });
+    }, []);
 
     if (!gameState) {
         return (
-            <div className="bg-gray-800 rounded-lg shadow-xl p-6">
-                <p className="text-gray-400">Esperando inicio de partida...</p>
+            <div className="modern-panel">
+                <p className="text-[#b0b0b0]">Esperando inicio de partida...</p>
             </div>
         );
     }
@@ -47,11 +74,12 @@ export default function GamePanel() {
         owner: gameState.owners[selectedTerritory],
         troops: gameState.troopsByTerritory[selectedTerritory] || {},
         isMine: gameState.owners[selectedTerritory] === userId,
+        zone: gameState.zones?.[selectedTerritory],
     } : null;
 
     // Calcular coste total de unidades seleccionadas
     const totalCost = Object.entries(selectedUnits).reduce((sum, [rank, count]) => {
-        return sum + (UNIT_COSTS[rank] || 0) * count;
+        return sum + (unitCosts[rank] || 0) * count;
     }, 0);
 
     const handleUnitChange = (rank: string, delta: number) => {
@@ -171,6 +199,140 @@ export default function GamePanel() {
         wsService.upgradePath({ pathId });
     };
 
+    const handleReinforce = () => {
+        if (!selectedTerritory || !selectedTerritoryInfo?.isMine) {
+            alert('Selecciona un territorio propio para reforzar');
+            return;
+        }
+        wsService.reinforce(selectedTerritory);
+        setSelectedTerritory(null);
+    };
+
+    const handleUseZone = () => {
+        if (!selectedTerritory || !selectedTerritoryInfo?.isMine) {
+            alert('Selecciona un territorio propio con zona especial');
+            return;
+        }
+        wsService.useZone(selectedTerritory);
+        setSelectedTerritory(null);
+    };
+
+    const handleConsolidate = () => {
+        if (!selectedTerritory || !selectedTerritoryInfo?.isMine) {
+            alert('Selecciona un territorio propio para consolidar');
+            return;
+        }
+        wsService.consolidate(selectedTerritory);
+        setSelectedTerritory(null);
+    };
+
+    const handleStartMove = () => {
+        if (!selectedTerritory || !selectedTerritoryInfo?.isMine) {
+            alert('Selecciona un territorio propio para mover tropas');
+            return;
+        }
+        setMoveFrom(selectedTerritory);
+        setIsMoveMode(true);
+        setMoveDestinations([]);
+        setSelectedTerritory(null);
+    };
+
+    const handleAddMoveDestination = () => {
+        if (!selectedTerritory || !selectedTerritoryInfo?.isMine) {
+            alert('Selecciona un territorio propio como destino');
+            return;
+        }
+        if (moveDestinations.length >= 4) {
+            alert('Máximo 4 territorios destino');
+            return;
+        }
+        if (moveDestinations.some(d => d.territoryId === selectedTerritory)) {
+            alert('Este territorio ya está seleccionado como destino');
+            return;
+        }
+        if (selectedTerritory === moveFrom) {
+            alert('No puedes mover al mismo territorio de origen');
+            return;
+        }
+        setMoveDestinations([...moveDestinations, {
+            territoryId: selectedTerritory,
+            units: { d4: 0, d6: 0, d8: 0, d12: 0, d20: 0, d100: 0 }
+        }]);
+        setSelectedTerritory(null);
+    };
+
+    const handleUpdateMoveDestinationUnits = (destIndex: number, rank: string, delta: number) => {
+        setMoveDestinations(prev => {
+            const newDests = [...prev];
+            const currentUnits = newDests[destIndex].units[rank] || 0;
+            newDests[destIndex].units[rank] = Math.max(0, currentUnits + delta);
+            return newDests;
+        });
+    };
+
+    const handleExecuteMove = () => {
+        if (!moveFrom) {
+            alert('Error: no hay territorio de origen');
+            return;
+        }
+        if (moveDestinations.length === 0) {
+            alert('Selecciona al menos un territorio destino');
+            return;
+        }
+
+        // Validar que hay tropas asignadas
+        const hasUnits = moveDestinations.some(dest =>
+            Object.values(dest.units).some(count => count > 0)
+        );
+        if (!hasUnits) {
+            alert('Asigna tropas a al menos un territorio destino');
+            return;
+        }
+
+        // Obtener tropas totales del territorio origen
+        const originTroops = gameState.troopsByTerritory[moveFrom] || {};
+        const totalAssigned: Record<string, number> = {};
+
+        // Calcular total de tropas asignadas
+        moveDestinations.forEach(dest => {
+            Object.entries(dest.units).forEach(([rank, count]) => {
+                totalAssigned[rank] = (totalAssigned[rank] || 0) + count;
+            });
+        });
+
+        // Validar que no se asignen más tropas de las disponibles
+        for (const rank of Object.keys(totalAssigned)) {
+            if (totalAssigned[rank] > (originTroops[rank] || 0)) {
+                alert(`No tienes suficientes ${UNIT_NAMES[rank]} en el territorio origen`);
+                return;
+            }
+        }
+
+        // Preparar movimientos
+        const movements = moveDestinations
+            .filter(dest => Object.values(dest.units).some(count => count > 0))
+            .map(dest => ({
+                fromId: moveFrom,
+                toId: dest.territoryId,
+                units: dest.units
+            }));
+
+        wsService.move({ movements });
+
+        // Reset
+        setMoveFrom(null);
+        setMoveDestinations([]);
+        setIsMoveMode(false);
+        setSelectedTerritory(null);
+    };
+
+    const handleCancelMove = () => {
+        setMoveFrom(null);
+        setMoveDestinations([]);
+        setIsMoveMode(false);
+        setSelectedTerritory(null);
+    };
+
     const handleEndTurn = () => {
         if (confirm('¿Terminar turno?')) {
             wsService.endTurn();
@@ -182,64 +344,112 @@ export default function GamePanel() {
         setAttackFrom(null);
         setFortifyFrom(null);
         setSelectedTerritory(null);
+        if (isMoveMode) {
+            handleCancelMove();
+        }
     };
 
+    // Obtener información del jugador actual
+    const currentPlayer = gameState.players
+        ? Object.values(gameState.players).find((p: any) => p.userId === userId)
+        : null;
+
     return (
-        <div className="bg-gray-800 rounded-lg shadow-xl p-6 space-y-6 max-h-[calc(100vh-2rem)] overflow-y-auto">
+        <div className="modern-panel space-y-3 h-full overflow-y-auto slide-in">
             {/* Turn Info */}
-            <div>
-                <h2 className="text-2xl font-bold text-white mb-4">Turno {gameState.turn}</h2>
-                <div className="text-sm text-gray-400 mb-2">
-                    Fase: <span className="text-yellow-400 font-bold capitalize">{gameState.phase}</span>
+            <div className="border-b border-[#2a2a3e] pb-2 flex-shrink-0">
+                <h2 className="modern-panel-header text-base mb-1">Turno {gameState.turn}</h2>
+                <div className="text-sm text-[#b0b0b0] mb-1">
+                    Fase: <span className="text-[#00d4ff] font-bold capitalize">{gameState.phase}</span>
                 </div>
                 {isMyTurn ? (
-                    <div className="text-sm text-green-400 font-bold">
-                        ✓ Es tu turno
+                    <div className="text-sm text-[#00ff88] font-bold flex items-center gap-1">
+                        <span>✓</span> <span>Es tu turno</span>
                     </div>
                 ) : (
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-[#707070]">
                         Esperando turno de otro jugador...
                     </div>
                 )}
             </div>
 
             {/* Resources */}
-            <div className="space-y-3">
+            <div className="space-y-2 border-b border-[#2a2a3e] pb-2 flex-shrink-0">
                 <div className="flex items-center justify-between">
-                    <span className="text-gray-300">Oro:</span>
-                    <span className="text-yellow-400 font-bold text-xl">{gameState.gold}</span>
+                    <span className="text-[#b0b0b0] flex items-center gap-2 font-semibold text-sm">
+                        <span>💰</span> Oro
+                    </span>
+                    <span className="text-[#ffd700] font-bold text-lg">{(currentPlayer as any)?.gold || gameState.gold || 0}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                    <span className="text-gray-300">Acciones:</span>
-                    <span className="text-blue-400 font-bold text-xl">{gameState.actionsLeft}</span>
+                    <span className="text-[#b0b0b0] flex items-center gap-2 font-semibold text-sm">
+                        <span>⚡</span> Acciones
+                    </span>
+                    <span className="text-[#00d4ff] font-bold text-lg">{gameState.actionsLeft || 0}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                    <span className="text-gray-300">Tiempo:</span>
-                    <span className="text-red-400 font-bold text-xl">
-                        {Math.floor(gameState.timers.turnSecondsLeft / 60)}:
-                        {(gameState.timers.turnSecondsLeft % 60).toString().padStart(2, '0')}
+                    <span className="text-[#b0b0b0] flex items-center gap-2 font-semibold text-sm">
+                        <span>⏳</span> Tiempo
+                    </span>
+                    <span className="text-[#ffaa00] font-bold text-lg font-mono">
+                        {gameState.timers?.turnSecondsLeft
+                            ? `${Math.floor(gameState.timers.turnSecondsLeft / 60)}:${(gameState.timers.turnSecondsLeft % 60).toString().padStart(2, '0')}`
+                            : '--:--'
+                        }
                     </span>
                 </div>
             </div>
 
             {/* Selected Territory Info */}
-            {selectedTerritoryInfo && (
-                <div className="p-3 bg-gray-700 rounded-lg">
-                    <p className="text-sm font-bold text-white mb-2">{selectedTerritoryInfo.name}</p>
-                    <div className="text-xs text-gray-300 space-y-1">
-                        <div>Propietario: {selectedTerritoryInfo.isMine ? 'Tú' : 'Enemigo'}</div>
-                        <div>Tropas:</div>
-                        <div className="ml-2 space-y-0.5">
-                            {Object.entries(selectedTerritoryInfo.troops).map(([rank, count]: [string, any]) => (
-                                count > 0 && (
-                                    <div key={rank} className="flex justify-between">
-                                        <span>{UNIT_NAMES[rank]}:</span>
-                                        <span className="font-bold">{count}</span>
-                                    </div>
-                                )
-                            ))}
+            {selectedTerritoryInfo && !isMoveMode && (
+                <div className="p-3 bg-[#0a0a0f] rounded-lg border border-[#2a2a3e] flex-shrink-0">
+                    <p className="text-sm font-bold text-[#00d4ff] mb-2">{selectedTerritoryInfo.name}</p>
+                    <div className="text-xs text-[#b0b0b0] space-y-1">
+                        <div className="flex items-center gap-2">
+                            <span>Propietario:</span>
+                            <span className={`font-bold ${selectedTerritoryInfo.isMine ? 'text-[#00ff88]' : 'text-[#ff4444]'}`}>
+                                {selectedTerritoryInfo.isMine ? 'Tú' : 'Enemigo'}
+                            </span>
+                        </div>
+                        {selectedTerritoryInfo.zone && (
+                            <div className="flex items-center gap-2">
+                                <span>Zona:</span>
+                                <span className="text-[#ffd700] font-bold capitalize">{selectedTerritoryInfo.zone}</span>
+                            </div>
+                        )}
+                        <div className="mt-2">
+                            <div className="text-xs font-semibold mb-1">Tropas:</div>
+                            <div className="ml-2 space-y-0.5">
+                                {Object.entries(selectedTerritoryInfo.troops).map(([rank, count]: [string, any]) => (
+                                    count > 0 && (
+                                        <div key={rank} className="flex justify-between text-xs">
+                                            <span className="text-[#b0b0b0]">{UNIT_NAMES[rank]}:</span>
+                                            <span className="font-bold text-[#00d4ff]">{count}</span>
+                                        </div>
+                                    )
+                                ))}
+                            </div>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Move Mode Info */}
+            {isMoveMode && selectedTerritoryInfo && (
+                <div className="p-3 bg-[#0a0a0f] rounded-lg border border-[#00d4ff]">
+                    <p className="text-sm font-bold text-[#00d4ff] mb-2">
+                        {selectedTerritoryInfo.isMine
+                            ? `✅ Territorio destino: ${selectedTerritoryInfo.name}`
+                            : `❌ ${selectedTerritoryInfo.name} no es tuyo`}
+                    </p>
+                    {selectedTerritoryInfo.isMine && moveDestinations.length < 4 && (
+                        <button
+                            onClick={handleAddMoveDestination}
+                            className="w-full modern-button text-sm py-2 px-3 mt-2"
+                        >
+                            + Añadir como Destino
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -249,31 +459,63 @@ export default function GamePanel() {
                     {/* DEPLOY Phase */}
                     {gameState.phase === 'deploy' && (
                         <div className="space-y-4">
-                            <h3 className="text-lg font-bold text-white">Desplegar Tropas</h3>
+                            <h3 className="modern-panel-header text-sm">Acciones de Despliegue</h3>
+
+                            {/* Acciones rápidas en territorio propio */}
+                            {selectedTerritoryInfo?.isMine && (
+                                <div className="space-y-2 p-3 bg-[#0a0a0f] rounded-lg border border-[#2a2a3e]">
+                                    <p className="text-xs text-[#b0b0b0] mb-2">Acciones especiales:</p>
+                                    <button
+                                        onClick={handleReinforce}
+                                        className="w-full modern-button secondary text-sm py-2"
+                                    >
+                                        <span>🛡️</span>
+                                        <span>Reforzar (+1 eficacia defensa)</span>
+                                    </button>
+                                    <button
+                                        onClick={handleConsolidate}
+                                        className="w-full modern-button secondary text-sm py-2"
+                                    >
+                                        <span>⚔️</span>
+                                        <span>Consolidar (+2 dados defensa)</span>
+                                    </button>
+                                    {selectedTerritoryInfo.zone && (selectedTerritoryInfo.zone === 'oro' || selectedTerritoryInfo.zone === 'reclutamiento') && (
+                                        <button
+                                            onClick={handleUseZone}
+                                            className="w-full modern-button text-sm py-2"
+                                        >
+                                            <span>✨</span>
+                                            <span>Utilizar Zona</span>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            <h3 className="text-sm text-[#b0b0b0] font-semibold mb-2">Desplegar Tropas</h3>
 
                             {/* Unit Selector */}
                             <div className="space-y-2">
-                                {Object.entries(UNIT_COSTS).map(([rank, cost]) => (
-                                    <div key={rank} className="flex items-center justify-between p-2 bg-gray-700 rounded">
+                                {Object.entries(unitCosts).map(([rank, cost]) => (
+                                    <div key={rank} className="flex items-center justify-between p-2 bg-[#0a0a0f] rounded border border-[#2a2a3e]">
                                         <div className="flex-1">
-                                            <div className="text-sm text-white">{UNIT_NAMES[rank]}</div>
-                                            <div className="text-xs text-gray-400">{cost} oro</div>
+                                            <div className="text-sm text-[#ffffff]">{UNIT_NAMES[rank]}</div>
+                                            <div className="text-xs text-[#b0b0b0]">{cost} oro</div>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => handleUnitChange(rank, -1)}
                                                 disabled={!selectedUnits[rank] || selectedUnits[rank] === 0}
-                                                className="w-8 h-8 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded"
+                                                className="w-8 h-8 bg-[#ff4444] hover:bg-[#cc0000] disabled:bg-[#2a2a3e] disabled:cursor-not-allowed text-white rounded transition-colors"
                                             >
                                                 -
                                             </button>
-                                            <span className="w-8 text-center text-white font-bold">
+                                            <span className="w-8 text-center text-[#ffffff] font-bold">
                                                 {selectedUnits[rank] || 0}
                                             </span>
                                             <button
                                                 onClick={() => handleUnitChange(rank, 1)}
                                                 disabled={totalCost + cost > gameState.gold}
-                                                className="w-8 h-8 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded"
+                                                className="w-8 h-8 bg-[#00ff88] hover:bg-[#00cc66] disabled:bg-[#2a2a3e] disabled:cursor-not-allowed text-[#0a0a0f] rounded transition-colors"
                                             >
                                                 +
                                             </button>
@@ -282,9 +524,9 @@ export default function GamePanel() {
                                 ))}
                             </div>
 
-                            <div className="flex items-center justify-between p-2 bg-gray-700 rounded">
-                                <span className="text-white font-bold">Total:</span>
-                                <span className={`font-bold ${totalCost > gameState.gold ? 'text-red-400' : 'text-yellow-400'}`}>
+                            <div className="flex items-center justify-between p-2 bg-[#0a0a0f] rounded border border-[#2a2a3e]">
+                                <span className="text-[#ffffff] font-bold">Total:</span>
+                                <span className={`font-bold ${totalCost > gameState.gold ? 'text-[#ff4444]' : 'text-[#ffd700]'}`}>
                                     {totalCost} oro
                                 </span>
                             </div>
@@ -292,9 +534,10 @@ export default function GamePanel() {
                             <button
                                 onClick={handleDeploy}
                                 disabled={!selectedTerritoryInfo?.isMine || totalCost === 0 || totalCost > gameState.gold}
-                                className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                                className="w-full modern-button disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Desplegar
+                                <span className="text-2xl">🏰</span>
+                                <span>Desplegar</span>
                             </button>
                         </div>
                     )}
@@ -302,40 +545,72 @@ export default function GamePanel() {
                     {/* ATTACK Phase */}
                     {gameState.phase === 'attack' && (
                         <div className="space-y-4">
-                            <h3 className="text-lg font-bold text-white">Atacar</h3>
+                            <h3 className="modern-panel-header text-sm">Acciones de Ataque</h3>
+
+                            {/* Acciones rápidas en territorio propio */}
+                            {selectedTerritoryInfo?.isMine && (
+                                <div className="space-y-2 p-3 bg-[#0a0a0f] rounded-lg border border-[#2a2a3e]">
+                                    <p className="text-xs text-[#b0b0b0] mb-2">Acciones especiales:</p>
+                                    <button
+                                        onClick={handleReinforce}
+                                        className="w-full modern-button secondary text-sm py-2"
+                                    >
+                                        <span>🛡️</span>
+                                        <span>Reforzar (+1 eficacia defensa)</span>
+                                    </button>
+                                    <button
+                                        onClick={handleConsolidate}
+                                        className="w-full modern-button secondary text-sm py-2"
+                                    >
+                                        <span>⚔️</span>
+                                        <span>Consolidar (+2 dados defensa)</span>
+                                    </button>
+                                    {selectedTerritoryInfo.zone && (selectedTerritoryInfo.zone === 'oro' || selectedTerritoryInfo.zone === 'reclutamiento') && (
+                                        <button
+                                            onClick={handleUseZone}
+                                            className="w-full modern-button text-sm py-2"
+                                        >
+                                            <span>✨</span>
+                                            <span>Utilizar Zona</span>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            <h3 className="text-sm text-[#b0b0b0] font-semibold mb-2">Atacar</h3>
 
                             {!attackFrom ? (
-                                <div className="p-3 bg-yellow-900/30 rounded-lg border border-yellow-600">
-                                    <p className="text-sm text-yellow-200">Selecciona tu territorio de origen en el mapa</p>
+                                <div className="p-3 bg-[#0a0a0f] rounded-lg border border-[#ffaa00]">
+                                    <p className="text-sm text-[#ffaa00]">Selecciona tu territorio de origen en el mapa</p>
                                 </div>
                             ) : (
-                                <div className="p-3 bg-gray-700 rounded-lg">
-                                    <p className="text-sm text-white">Origen: <span className="font-bold">{mapData.territories.find((t: any) => t.id === attackFrom)?.name || attackFrom}</span></p>
-                                    <p className="text-xs text-gray-400 mt-1">Ahora selecciona el territorio enemigo a atacar</p>
+                                <div className="p-3 bg-[#0a0a0f] rounded-lg border border-[#2a2a3e]">
+                                    <p className="text-sm text-[#ffffff]">Origen: <span className="font-bold text-[#00d4ff]">{mapData.territories.find((t: any) => t.id === attackFrom)?.name || attackFrom}</span></p>
+                                    <p className="text-xs text-[#b0b0b0] mt-1">Ahora selecciona el territorio enemigo a atacar</p>
                                 </div>
                             )}
 
                             {/* Unit Selector */}
                             <div className="space-y-2">
-                                {Object.entries(UNIT_COSTS).map(([rank]) => (
-                                    <div key={rank} className="flex items-center justify-between p-2 bg-gray-700 rounded">
+                                {Object.entries(unitCosts).map(([rank]) => (
+                                    <div key={rank} className="flex items-center justify-between p-2 bg-[#0a0a0f] rounded border border-[#2a2a3e]">
                                         <div className="flex-1">
-                                            <div className="text-sm text-white">{UNIT_NAMES[rank]}</div>
+                                            <div className="text-sm text-[#ffffff]">{UNIT_NAMES[rank]}</div>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => handleUnitChange(rank, -1)}
                                                 disabled={!selectedUnits[rank] || selectedUnits[rank] === 0}
-                                                className="w-8 h-8 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded"
+                                                className="w-8 h-8 bg-[#ff4444] hover:bg-[#cc0000] disabled:bg-[#2a2a3e] disabled:cursor-not-allowed text-white rounded transition-colors"
                                             >
                                                 -
                                             </button>
-                                            <span className="w-8 text-center text-white font-bold">
+                                            <span className="w-8 text-center text-[#ffffff] font-bold">
                                                 {selectedUnits[rank] || 0}
                                             </span>
                                             <button
                                                 onClick={() => handleUnitChange(rank, 1)}
-                                                className="w-8 h-8 bg-green-600 hover:bg-green-700 text-white rounded"
+                                                className="w-8 h-8 bg-[#00ff88] hover:bg-[#00cc66] text-[#0a0a0f] rounded transition-colors"
                                             >
                                                 +
                                             </button>
@@ -347,9 +622,10 @@ export default function GamePanel() {
                             <button
                                 onClick={handleAttack}
                                 disabled={!attackFrom || !selectedTerritory || attackFrom === selectedTerritory || Object.values(selectedUnits).every(v => v === 0)}
-                                className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                                className="w-full modern-button danger disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Atacar
+                                <span className="text-2xl">⚔️</span>
+                                <span>Atacar</span>
                             </button>
                         </div>
                     )}
@@ -357,40 +633,158 @@ export default function GamePanel() {
                     {/* FORTIFY Phase */}
                     {gameState.phase === 'fortify' && (
                         <div className="space-y-4">
-                            <h3 className="text-lg font-bold text-white">Fortificar</h3>
+                            <h3 className="modern-panel-header text-sm">Acciones de Fortificación</h3>
+
+                            {/* Botón para activar modo Mover */}
+                            {!isMoveMode && (
+                                <button
+                                    onClick={handleStartMove}
+                                    className="w-full modern-button secondary"
+                                >
+                                    <span>🚚</span>
+                                    <span>Mover Tropas (hasta 4 territorios)</span>
+                                </button>
+                            )}
+
+                            {/* Modo Mover */}
+                            {isMoveMode && moveFrom && (
+                                <div className="space-y-4 p-3 bg-[#0a0a0f] rounded-lg border border-[#2a2a3e]">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-md font-bold text-[#00d4ff]">Mover Tropas</h4>
+                                        <button
+                                            onClick={handleCancelMove}
+                                            className="text-xs modern-button danger py-1 px-2"
+                                        >
+                                            Cancelar
+                                        </button>
+                                    </div>
+
+                                    <div className="text-xs text-[#b0b0b0] mb-2">
+                                        Origen: <span className="font-bold text-[#ffd700]">
+                                            {mapData.territories.find((t: any) => t.id === moveFrom)?.name || moveFrom}
+                                        </span>
+                                    </div>
+
+                                    {/* Tropas disponibles en origen */}
+                                    <div className="text-xs text-[#b0b0b0] mb-2">
+                                        Tropas disponibles:
+                                        {Object.entries(gameState.troopsByTerritory[moveFrom] || {}).map(([rank, count]: [string, any]) => (
+                                            count > 0 && (
+                                                <span key={rank} className="ml-2">
+                                                    {UNIT_NAMES[rank]}: <span className="font-bold text-[#00d4ff]">{count}</span>
+                                                </span>
+                                            )
+                                        ))}
+                                    </div>
+
+                                    {/* Destinos seleccionados */}
+                                    {moveDestinations.length > 0 && (
+                                        <div className="space-y-3">
+                                            {moveDestinations.map((dest, index) => {
+                                                const destInfo = mapData.territories.find((t: any) => t.id === dest.territoryId);
+                                                return (
+                                                    <div key={index} className="p-2 bg-[#1a1a2e] rounded border border-[#2a2a3e]">
+                                                        <div className="text-xs text-[#ffffff] font-bold mb-2">
+                                                            Destino {index + 1}: {destInfo?.name || dest.territoryId}
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            {Object.entries(unitCosts).map(([rank]) => {
+                                                                const originCount = gameState.troopsByTerritory[moveFrom]?.[rank] || 0;
+                                                                const assignedToOthers = moveDestinations
+                                                                    .filter((_, i) => i !== index)
+                                                                    .reduce((sum, d) => sum + (d.units[rank] || 0), 0);
+                                                                const available = originCount - assignedToOthers;
+                                                                const current = dest.units[rank] || 0;
+
+                                                                return (
+                                                                    <div key={rank} className="flex items-center justify-between text-xs">
+                                                                        <span className="text-[#b0b0b0]">{UNIT_NAMES[rank]}:</span>
+                                                                        <div className="flex items-center gap-1">
+                                                                            <button
+                                                                                onClick={() => handleUpdateMoveDestinationUnits(index, rank, -1)}
+                                                                                disabled={current === 0}
+                                                                                className="w-6 h-6 bg-[#ff4444] hover:bg-[#cc0000] disabled:bg-[#2a2a3e] disabled:cursor-not-allowed text-white rounded text-xs transition-colors"
+                                                                            >
+                                                                                -
+                                                                            </button>
+                                                                            <span className="w-8 text-center text-[#ffffff] font-bold">
+                                                                                {current}
+                                                                            </span>
+                                                                            <button
+                                                                                onClick={() => handleUpdateMoveDestinationUnits(index, rank, 1)}
+                                                                                disabled={current >= available}
+                                                                                className="w-6 h-6 bg-[#00ff88] hover:bg-[#00cc66] disabled:bg-[#2a2a3e] disabled:cursor-not-allowed text-[#0a0a0f] rounded text-xs transition-colors"
+                                                                            >
+                                                                                +
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* Botón para añadir destino */}
+                                    {moveDestinations.length < 4 && (
+                                        <button
+                                            onClick={handleAddMoveDestination}
+                                            className="w-full modern-button text-sm py-2"
+                                        >
+                                            <span>+</span>
+                                            <span>Añadir Territorio Destino ({moveDestinations.length}/4)</span>
+                                        </button>
+                                    )}
+
+                                    {/* Botón para ejecutar movimiento */}
+                                    <button
+                                        onClick={handleExecuteMove}
+                                        disabled={moveDestinations.length === 0}
+                                        className="w-full modern-button success disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <span>✅</span>
+                                        <span>Ejecutar Movimiento (1 acción)</span>
+                                    </button>
+                                </div>
+                            )}
+
+                            <h3 className="text-sm text-[#b0b0b0] font-semibold mb-2">Fortificar</h3>
 
                             {!fortifyFrom ? (
-                                <div className="p-3 bg-blue-900/30 rounded-lg border border-blue-600">
-                                    <p className="text-sm text-blue-200">Selecciona tu territorio de origen en el mapa</p>
+                                <div className="p-3 bg-[#0a0a0f] rounded-lg border border-[#00d4ff]">
+                                    <p className="text-sm text-[#00d4ff]">Selecciona tu territorio de origen en el mapa</p>
                                 </div>
                             ) : (
-                                <div className="p-3 bg-gray-700 rounded-lg">
-                                    <p className="text-sm text-white">Origen: <span className="font-bold">{mapData.territories.find((t: any) => t.id === fortifyFrom)?.name || fortifyFrom}</span></p>
-                                    <p className="text-xs text-gray-400 mt-1">Ahora selecciona el territorio destino</p>
+                                <div className="p-3 bg-[#0a0a0f] rounded-lg border border-[#2a2a3e]">
+                                    <p className="text-sm text-[#ffffff]">Origen: <span className="font-bold text-[#00d4ff]">{mapData.territories.find((t: any) => t.id === fortifyFrom)?.name || fortifyFrom}</span></p>
+                                    <p className="text-xs text-[#b0b0b0] mt-1">Ahora selecciona el territorio destino</p>
                                 </div>
                             )}
 
                             {/* Unit Selector */}
                             <div className="space-y-2">
-                                {Object.entries(UNIT_COSTS).map(([rank]) => (
-                                    <div key={rank} className="flex items-center justify-between p-2 bg-gray-700 rounded">
+                                {Object.entries(unitCosts).map(([rank]) => (
+                                    <div key={rank} className="flex items-center justify-between p-2 bg-[#0a0a0f] rounded border border-[#2a2a3e]">
                                         <div className="flex-1">
-                                            <div className="text-sm text-white">{UNIT_NAMES[rank]}</div>
+                                            <div className="text-sm text-[#ffffff]">{UNIT_NAMES[rank]}</div>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => handleUnitChange(rank, -1)}
                                                 disabled={!selectedUnits[rank] || selectedUnits[rank] === 0}
-                                                className="w-8 h-8 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded"
+                                                className="w-8 h-8 bg-[#ff4444] hover:bg-[#cc0000] disabled:bg-[#2a2a3e] disabled:cursor-not-allowed text-white rounded transition-colors"
                                             >
                                                 -
                                             </button>
-                                            <span className="w-8 text-center text-white font-bold">
+                                            <span className="w-8 text-center text-[#ffffff] font-bold">
                                                 {selectedUnits[rank] || 0}
                                             </span>
                                             <button
                                                 onClick={() => handleUnitChange(rank, 1)}
-                                                className="w-8 h-8 bg-green-600 hover:bg-green-700 text-white rounded"
+                                                className="w-8 h-8 bg-[#00ff88] hover:bg-[#00cc66] text-[#0a0a0f] rounded transition-colors"
                                             >
                                                 +
                                             </button>
@@ -402,9 +796,10 @@ export default function GamePanel() {
                             <button
                                 onClick={handleFortify}
                                 disabled={!fortifyFrom || !selectedTerritory || fortifyFrom === selectedTerritory || Object.values(selectedUnits).every(v => v === 0)}
-                                className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                                className="w-full modern-button secondary disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Fortificar
+                                <span className="text-2xl">🛡️</span>
+                                <span>Fortificar</span>
                             </button>
                         </div>
                     )}
@@ -412,21 +807,21 @@ export default function GamePanel() {
             )}
 
             {/* Paths */}
-            <div>
-                <h3 className="text-lg font-bold text-white mb-2">Caminos</h3>
-                <div className="space-y-2">
+            <div className="flex-shrink-0">
+                <h3 className="modern-panel-header text-sm mb-2">Caminos</h3>
+                <div className="space-y-1">
                     {Object.entries(gameState.paths || {}).map(([path, level]) => (
-                        <div key={path} className="flex items-center justify-between p-2 bg-gray-700 rounded">
+                        <div key={path} className="flex items-center justify-between p-1 bg-[#0a0a0f] rounded border border-[#2a2a3e]">
                             <div>
-                                <span className="text-sm text-gray-300">{path}:</span>
-                                <span className="ml-2 text-yellow-400 font-bold">N{level}</span>
+                                <span className="text-xs text-[#b0b0b0]">{path}:</span>
+                                <span className="ml-1 text-[#ffd700] font-bold text-xs">N{level}</span>
                             </div>
                             {isMyTurn && level < 3 && (
                                 <button
                                     onClick={() => handleUpgradePath(path)}
-                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded"
+                                    className="px-2 py-0.5 modern-button secondary text-xs"
                                 >
-                                    Subir
+                                    ↑
                                 </button>
                             )}
                         </div>
@@ -438,19 +833,21 @@ export default function GamePanel() {
             {isMyTurn && (
                 <button
                     onClick={handleEndTurn}
-                    className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                    className="w-full modern-button success text-xs py-2 flex-shrink-0"
                 >
-                    Terminar Turno
+                    <span>⏳</span>
+                    <span>Fin Turno</span>
                 </button>
             )}
 
             {/* Reset Selection */}
-            {(attackFrom || fortifyFrom || selectedTerritory) && (
+            {(attackFrom || fortifyFrom || selectedTerritory || isMoveMode) && (
                 <button
                     onClick={resetSelection}
-                    className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                    className="w-full modern-button secondary"
                 >
-                    Cancelar Selección
+                    <span>{isMoveMode ? '❌' : '↩️'}</span>
+                    <span>{isMoveMode ? 'Cancelar Movimiento' : 'Cancelar Selección'}</span>
                 </button>
             )}
         </div>
